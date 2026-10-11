@@ -1,0 +1,304 @@
+name: CI
+
+# One workflow for the whole monorepo (H03). The `changes` job decides which
+# area jobs run; `ci-ok` aggregates them and is the ONLY required status check.
+# (Separate path-filtered workflows would leave required checks "pending"
+# forever on PRs that don't touch them.)
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+# Cancel superseded runs on the same ref to save minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # What changed, and which areas actually exist yet?
+  # On push to main / manual runs, everything that exists is checked.
+  # ---------------------------------------------------------------------------
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      ml: ${{ steps.filter.outputs.ml == 'true' || github.event_name != 'pull_request' }}
+      backend: ${{ steps.filter.outputs.backend == 'true' || github.event_name != 'pull_request' }}
+      frontend: ${{ steps.filter.outputs.frontend == 'true' || github.event_name != 'pull_request' }}
+      compose: ${{ steps.filter.outputs.compose == 'true' || github.event_name != 'pull_request' }}
+      backend_ready: ${{ steps.exists.outputs.backend_ready }}
+      frontend_ready: ${{ steps.exists.outputs.frontend_ready }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            shared: &shared
+              - 'pyproject.toml'
+              - 'requirements-dev.txt'
+              - '.github/workflows/ci.yml'
+            ml:
+              - *shared
+              - 'ml/**'
+            backend:
+              - *shared
+              - 'backend/**'
+              - 'ml/src/**'
+            frontend:
+              - '.github/workflows/ci.yml'
+              - 'frontend/**'
+            compose:
+              - '.github/workflows/ci.yml'
+              - 'docker-compose*.yml'
+              - '.env.example'
+              - 'backend/Dockerfile'
+              - 'frontend/Dockerfile'
+
+      # Backend/frontend jobs stay dormant until those apps are scaffolded
+      # (H16 / H21) — they switch on automatically, no workflow edit needed.
+      - name: Which apps are scaffolded?
+        id: exists
+        run: |
+          [ -f backend/requirements.txt ] && echo "backend_ready=true" >> "$GITHUB_OUTPUT" || echo "backend_ready=false" >> "$GITHUB_OUTPUT"
+          [ -f frontend/package-lock.json ] && echo "frontend_ready=true" >> "$GITHUB_OUTPUT" || echo "frontend_ready=false" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # ML pipeline: lint, format, tests + coverage. Tests use synthetic fixtures,
+  # never the real survey data (which is not in the repo).
+  # ---------------------------------------------------------------------------
+  ml:
+    name: ML (ruff · pytest · coverage)
+    needs: changes
+    if: needs.changes.outputs.ml == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            ml/requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r ml/requirements.txt -r requirements-dev.txt
+
+      - name: Lint — ruff
+        run: ruff check ml
+
+      - name: Format — ruff format --check
+        run: ruff format --check ml
+
+      - name: Tests + coverage (gate = fail_under in pyproject.toml)
+        run: pytest ml/tests --cov=ml/src --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-ml
+          path: coverage.xml
+          if-no-files-found: ignore
+
+      # Informational for now; make blocking once deps are pinned (H01).
+      - name: Dependency audit — pip-audit (non-blocking)
+        continue-on-error: true
+        run: pip-audit -r ml/requirements.txt
+
+  # ---------------------------------------------------------------------------
+  # Backend: same gates + a real Postgres service for integration tests.
+  # ---------------------------------------------------------------------------
+  backend:
+    name: Backend (ruff · pytest + Postgres)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' && needs.changes.outputs.backend_ready == 'true'
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: healthlens
+          POSTGRES_PASSWORD: healthlens
+          POSTGRES_DB: healthlens_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U healthlens -d healthlens_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://healthlens:healthlens@localhost:5432/healthlens_test
+      CORS_ORIGINS: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            ml/requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt -r ml/requirements.txt -r requirements-dev.txt
+
+      - name: Lint — ruff
+        run: ruff check backend
+
+      - name: Format — ruff format --check
+        run: ruff format --check backend
+
+      - name: Tests + coverage
+        run: pytest backend/tests --cov=backend/app --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-backend
+          path: coverage.xml
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # Frontend: lint, typecheck, test, production build.
+  # Scripts that don't exist yet are skipped (--if-present).
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: Frontend (lint · typecheck · test · build)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' && needs.changes.outputs.frontend_ready == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm run typecheck --if-present
+      - run: npm test --if-present
+      - run: npm run build
+
+  # ---------------------------------------------------------------------------
+  # Repo hygiene: survey microdata and model binaries must never be committed
+  # (licence + repo size), and no secrets anywhere in history. Always runs.
+  # ---------------------------------------------------------------------------
+  hygiene:
+    name: Hygiene (no data · no models · no secrets)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # gitleaks scans full git history
+
+      - name: Block raw data, model artifacts, and .env files
+        run: |
+          fail=0
+          tracked="$(git ls-files)"
+
+          bad="$(printf '%s\n' "$tracked" | grep -E '^(data/raw|data/processed|ml/models)/' | grep -v '/\.gitkeep$' || true)"
+          if [ -n "$bad" ]; then
+            echo "::error::Raw/processed data or model artifacts are tracked — share them via cloud storage, not git:"
+            printf '%s\n' "$bad"; fail=1
+          fi
+
+          bin="$(printf '%s\n' "$tracked" | grep -Ei '\.(joblib|pkl|pickle|sav|sas7bdat|dta|ubj|parquet)$' | grep -v '/fixtures/' || true)"
+          if [ -n "$bin" ]; then
+            echo "::error::Binary data/model files are tracked:"
+            printf '%s\n' "$bin"; fail=1
+          fi
+
+          envs="$(printf '%s\n' "$tracked" | grep -E '(^|/)\.env(\..+)?$' | grep -v '\.env\.example$' || true)"
+          if [ -n "$envs" ]; then
+            echo "::error::.env files are tracked — use .env.example for templates:"
+            printf '%s\n' "$envs"; fail=1
+          fi
+
+          exit $fail
+
+      - name: Block files larger than 5 MB (codebook PDFs exempt)
+        run: |
+          limit=$((5 * 1024 * 1024))
+          fail=0
+          while IFS= read -r -d '' f; do
+            case "$f" in data/codebooks/*) continue ;; esac
+            [ -f "$f" ] || continue
+            size=$(stat -c%s "$f")
+            if [ "$size" -gt "$limit" ]; then
+              echo "::error file=$f::$f is $((size / 1024 / 1024)) MB (limit 5 MB). Use Git LFS or cloud storage."
+              fail=1
+            fi
+          done < <(git ls-files -z)
+          exit $fail
+
+      - name: gitleaks — secret scan (full history)
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/repo" \
+            ghcr.io/gitleaks/gitleaks:v8.18.4 \
+            detect --source /repo --redact --no-banner
+
+  # ---------------------------------------------------------------------------
+  # docker-compose.yml must stay valid — it's the "one command" promise.
+  # ---------------------------------------------------------------------------
+  compose:
+    name: docker-compose config
+    needs: changes
+    if: needs.changes.outputs.compose == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate compose file
+        run: docker compose -f docker-compose.yml config --quiet
+
+  # ---------------------------------------------------------------------------
+  # The single required status check. Skipped jobs (area untouched / not yet
+  # scaffolded) count as success; any failure or cancellation fails the gate.
+  # ---------------------------------------------------------------------------
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [changes, ml, backend, frontend, hygiene, compose]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All required jobs passed or were skipped
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "Job results: $RESULTS"
+          if echo "$RESULTS" | grep -Eq '"(failure|cancelled)"'; then
+            echo "::error::One or more CI jobs failed or were cancelled."
+            exit 1
+          fi

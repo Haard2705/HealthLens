@@ -1,0 +1,11 @@
+# CODEOWNERS — who is automatically requested for review on changed paths.
+# Docs: https://docs.github.com/articles/about-code-owners
+# TODO(H02): replace @teammate-* with real GitHub handles.
+
+*               @Haard2705
+/ml/            @Haard2705 @teammate-ml
+/data/          @Haard2705 @teammate-data
+/backend/       @Haard2705 @teammate-backend
+/frontend/      @Haard2705 @teammate-frontend
+/.github/       @Haard2705
+/healthlens-todo.md   @Haard2705 @teammate-ml @teammate-data @teammate-backend @teammate-frontend

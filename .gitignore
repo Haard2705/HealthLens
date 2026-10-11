@@ -1,0 +1,50 @@
+# ---- Data & model artifacts (NEVER commit — share via cloud storage / Git LFS) ----
+data/raw/*
+!data/raw/.gitkeep
+ml/models/*
+!ml/models/.gitkeep
+*.sav
+*.sas7bdat
+*.dta
+*.joblib
+*.pkl
+*.pickle
+*.ubj
+*.parquet
+!tests/**/fixtures/**
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.egg-info/
+.ipynb_checkpoints/
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+out/
+frontend/build/
+*.tsbuildinfo
+next-env.d.ts
+.vercel
+
+# ---- Env & secrets ----
+.env
+.env.*
+!.env.example
+
+# ---- OS / editors ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

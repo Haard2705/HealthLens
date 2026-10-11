@@ -1,0 +1,24 @@
+# Weekly dependency update PRs. Add the commented entries once those apps exist
+# (Dependabot errors on directories without a manifest).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }
+
+  - package-ecosystem: pip
+    directory: /ml
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      ml-deps: { patterns: ["*"] }
+
+  # - package-ecosystem: pip          # enable in H16
+  #   directory: /backend
+  #   schedule: { interval: weekly }
+
+  # - package-ecosystem: npm          # enable in H21
+  #   directory: /frontend
+  #   schedule: { interval: weekly }

@@ -1,0 +1,40 @@
+# HealthLens local stack. Today only Postgres is live (H04); backend and
+# frontend are enabled in H16 / H21. Run: docker compose up db
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-healthlens}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-healthlens}
+      POSTGRES_DB: ${POSTGRES_DB:-healthlens}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-healthlens} -d ${POSTGRES_DB:-healthlens}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # backend:            # enabled in H16
+  #   build: ./backend
+  #   env_file: .env
+  #   environment:
+  #     DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-healthlens}:${POSTGRES_PASSWORD:-healthlens}@db:5432/${POSTGRES_DB:-healthlens}
+  #   volumes:
+  #     - ./ml/models:/app/models:ro
+  #   ports: ["8000:8000"]
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+
+  # frontend:           # enabled in H21
+  #   build: ./frontend
+  #   environment:
+  #     NEXT_PUBLIC_API_URL: http://localhost:8000
+  #   ports: ["3000:3000"]
+  #   depends_on: [backend]
+
+volumes:
+  pgdata:
