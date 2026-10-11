@@ -1,10 +1,10 @@
 # ML pipeline runtime deps. Pin exact versions (pip freeze) once the env works — see H01.
-pandas>=2.2
-numpy>=1.26
-scikit-learn>=1.5
-xgboost>=2.1
-lightgbm>=4.5
-shap>=0.46
-matplotlib>=3.9
-joblib>=1.4
-pyarrow>=16.0
+pandas>=3.0.6
+numpy>=2.5.3
+scikit-learn>=1.9.1
+xgboost>=3.4.1
+lightgbm>=4.7.0
+shap>=0.52.0
+matplotlib>=3.11.2
+joblib>=1.6.0
+pyarrow>=25.0.1
