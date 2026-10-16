@@ -1,9 +1,12 @@
 # HealthLens — Build Roadmap & Assignment Tracker
 
-> **Scope:** End-to-end prototype of **HealthLens**, a diabetes-risk dashboard and model-comparison tool (course project, team of 4).
-> **Pipeline:** survey microdata → cleaning & feature engineering → Logistic Regression baseline vs. XGBoost (± LightGBM) → SHAP explanations → FastAPI + PostgreSQL → Next.js dashboard → deployed demo.
-> **Data:** start on the **CDC BRFSS "Diabetes Health Indicators"** placeholder (Kaggle), swap to **Statistics Canada CCHS PUMF** once access is confirmed. The swap must be a _mapping exercise, not a rewrite_ — that constraint shapes the whole ML design.
-> This document is the **plan and source of truth**. Each assignment (`H##`) becomes one GitHub Issue.
+> **Scope:** **HealthLens: An Interactive Analytics and Risk Prediction Dashboard for Public Health Data.** A course project (team of 4, due **December 2026**, whole platform graded) that we intend to carry forward toward a **beta pilot with a local clinic or the regional hospital**. The pilot is _not_ part of this semester; we build so it is possible and document what it would take (`H48`).
+> **Two layers, one product:**
+> 1. **Public-health analytics (no personal data):** survey microdata → cleaning & features → Logistic Regression baseline vs. XGBoost → SHAP → FastAPI + PostgreSQL → Next.js dashboard.
+> 2. **Clinical workspace (synthetic patients only for now):** three roles: **admin, doctor, patient**, with login, role-based access, patient records, medications, progress timelines, prediction explanations, and an AI assistant. Synthetic data sits behind a swappable source layer so real data can replace it later.
+> **Data:** survey side starts on the **CDC BRFSS "Diabetes Health Indicators"** placeholder (Kaggle) and swaps to **Statistics Canada CCHS PUMF** if access is confirmed. Patient side uses a **seeded synthetic generator** (`H36`). Both swaps must be _mapping exercises, not rewrites_. That constraint shapes the design.
+> **Hard rule:** no real patient data enters this project, its database, its git history, or any external AI service, until the pilot-readiness work (`H48`) is done and a clinic's privacy officer has agreed in writing.
+> This document is the **plan and source of truth**. Each assignment (`H##`) becomes one GitHub Issue. IDs are stable labels, not an ordering; order comes from `Depends on:` and Appendix A.
 
 ---
 
@@ -36,7 +39,12 @@
    - [E2 — Modeling & Explainability](#epic-e2--modeling--explainability)
    - [E3 — Backend API (FastAPI + PostgreSQL)](#epic-e3--backend-api-fastapi--postgresql)
    - [E4 — Frontend Dashboard (Next.js)](#epic-e4--frontend-dashboard-nextjs)
-   - [E5 — Integration, Deployment & Delivery](#epic-e5--integration-deployment--delivery)
+   - [E5 — Identity, Access & Audit](#epic-e5--identity-access--audit)
+   - [E6 — Clinical Records (synthetic, swappable)](#epic-e6--clinical-records-synthetic-swappable)
+   - [E7 — Role-Based Frontend](#epic-e7--role-based-frontend)
+   - [E8 — AI Features](#epic-e8--ai-features)
+   - [E9 — Pilot Readiness (paperwork, not code)](#epic-e9--pilot-readiness-paperwork-not-code)
+   - [E10 — Integration, Deployment & Delivery](#epic-e10--integration-deployment--delivery)
 10. [Appendices](#10-appendices)
 
 ---
@@ -109,6 +117,19 @@ Every PR runs: **lint + format check → tests + coverage → frontend lint/type
 - **Survey data stays out of git.** `data/raw/` and `ml/models/` are gitignored and CI blocks them. Follow the Statistics Canada Open Licence terms and never attempt to re-identify respondents.
 - **Report subgroup performance** (by sex, age band, income band): a model that's good on average but poor for one group is a finding, not a footnote.
 - **Explain limitations in plain language**: self-reported survey data, cross-sectional (correlation ≠ causation), population ≠ individual.
+
+#### Patient data & access (clinical layer)
+
+- **Synthetic only, clearly flagged.** Every patient row carries `is_synthetic = true`; the UI shows a "demo data" banner while any synthetic row is loaded. Real data stays out until `H48`.
+- **Least privilege, not "full access".**
+  - **Patient** reads only their own record.
+  - **Doctor** reads and edits only patients **assigned** to them, never "all patients".
+  - **Admin** manages users, assignments, and the system. Reading a patient's clinical record is allowed but **always audit-logged** (and shows up in the audit viewer).
+- **Authorization is enforced in the backend, on every request.** Hiding a button in the UI is convenience, not security.
+- **Every read or write of patient data is written to an append-only audit log** (who, role, action, resource, when). The log must never contain clinical content.
+- **Don't roll our own crypto or sessions.** Use a maintained password-hashing library (argon2/bcrypt) and signed tokens/cookies; no homemade schemes.
+- **AI never sees data it shouldn't.** The assistant only calls role-scoped backend endpoints (never the DB directly) and, by default, never sends patient-identifying text to an external service (`H45`).
+- **The model is a population-level estimate, not clinical decision support.** It is trained on self-reported survey factors, not lab values. Patient-facing and doctor-facing copy must say so (`H40`).
 
 ### 2.9 Separation of concerns (the swap-the-data-source rule)
 
@@ -241,6 +262,27 @@ sequenceDiagram
 
 ---
 
+### 4.5 Access control and audit (clinical layer)
+
+```mermaid
+flowchart TB
+    U["Browser<br/>admin · doctor · patient"] -->|"httpOnly cookie"| FE["Next.js<br/>route guards = UX only"]
+    FE -->|"same-domain proxy"| API["FastAPI"]
+    subgraph SEC["Backend enforcement (the real security)"]
+        A1["current_user<br/>(who are you?)"] --> A2["require_role<br/>(what may you do?)"] --> A3["get_accessible_patient<br/>(which records?)"]
+        A3 --> AUD["audit helper<br/>(write event)"]
+    end
+    API --> A1
+    AUD --> DB[("PostgreSQL<br/>users · patients · assignments<br/>observations · medications<br/>audit_events (append-only)")]
+    A3 --> REPO["PatientRepository"] --> SRC{"PatientDataSource"}
+    SRC -->|"now"| SYN["Synthetic generator<br/>is_synthetic = true"]
+    SRC -.->|"after H48"| REAL["FHIR / CSV importer"]
+    AI["AI assistant"] -->|"tools = same scoped endpoints"| API
+    AI -.->|"only if allowed (H45)"| LLM["External LLM"]
+```
+
+Every request passes the same three checks in the same order. The AI assistant is just another client of this layer, so it can never see more than the signed-in user.
+
 ## 5. The Data: BRFSS placeholder → CCHS target
 
 ### 5.1 BRFSS "Diabetes Health Indicators" (Kaggle) — start here today
@@ -284,25 +326,42 @@ sequenceDiagram
 
 ## 6. Milestones & Team Ownership
 
-| Milestone | Epics | Goal | Target |
+> **Assumed deadline: Friday 4 Dec 2026 (final demo + report).** Please confirm the exact date; if it's earlier, shift the table up. **Feature freeze is Fri 27 Nov**: the last week is for hardening, the report, and the demo, never for new features.
+
+| Milestone | Epics | Goal | Dates (2026) |
 |---|---|---|---|
-| **M0 — Foundation** | E0 | Repo, CI, local stack, CCHS access chase started | Week 1 |
-| **M1 — Model on placeholder** | E1, E2 | BRFSS → clean → LR + XGBoost → SHAP → `metrics.json`, one command | Week 2–3 |
-| **M2 — Walking skeleton** | thin slice of E3 + E4 | **One real chart ← one real endpoint ← Postgres**, plus `/predict` returning a number. Prove the whole loop before widening it. | Week 4 |
-| **M3 — Full dashboard** | E3, E4 full | All charts, prediction + SHAP explanation, model comparison & limitations view | Week 5–7 |
-| **M4 — Delivery** | E5 | Deployed, CCHS go/no-go executed, report + demo | Week 8+ |
+| **M0 — Foundation** | E0 | Repo, CI, branch protection, local stack, issues + board; CCHS access chase started; **access matrix agreed (H31)** | Wk 1: 16–23 Oct |
+| **M1 — Model on placeholder** | E1, E2 | BRFSS → clean → LR + XGBoost → SHAP → `metrics.json`, one command. In parallel: backend + frontend skeletons, auth design. | Wk 2: 24–30 Oct |
+| **M2 — Walking skeleton** | thin slice of E3, E4, E5 | **One real chart ← one real endpoint ← Postgres**, **login works end to end with 3 roles**, `/predict` returns a number. **CCHS go/no-go decided by 6 Nov.** | Wk 3: 31 Oct–6 Nov |
+| **M3 — Clinical workspace** | E6, E7 | Synthetic patients seeded; doctor workspace, patient portal, admin console; prediction + explanation in UI | Wk 4–5: 7–20 Nov |
+| **M4 — AI + deploy** | E8, E10 | Explanations + assistant; backend and frontend deployed to a live URL (synthetic data only) | Wk 5–6: 14–27 Nov |
+| **Feature freeze** | | No new features after this | **Fri 27 Nov** |
+| **M5 — Delivery** | E9, E10 | Pilot-readiness pack, final report, demo rehearsal, handover | Wk 7: 28 Nov–4 Dec |
 
 > **Walking-skeleton principle:** don't build five mocked screens. After the model exists, build the _thinnest vertical slice_ through every layer, then widen.
 
-**Suggested ownership** (one owner per area; everyone reviews everyone):
+### 6.1 Scope and cut line (decide this now, not in week 6)
+
+With ~7 weeks, a team still learning auth and security, and the whole platform graded, we protect a **working end-to-end product** over a wide, half-finished one. If we fall behind, we cut from the bottom of this list, and we never cut the top.
+
+| Tier | Assignments | Rule |
+|---|---|---|
+| **Must** (the graded product) | H01–H04, H06–H14, H16–H19, H21, H22, H31–H36, H37, H38, H41–H43, H46, H26–H28, H30 | Everything else depends on these. |
+| **Should** | H15, H20, H23, H24, H25, H39, H40, H44, H45, H47, H48 | Strong marks if they land; each one is independently droppable. |
+| **Stretch** | H29 (CCHS swap, only if H05 succeeds), LightGBM in H12, Synthea import, 2FA, row-level security in Postgres | Only with spare time after the freeze plan is safe. |
+
+> **Why audit logging (H34) is Must:** it's one table plus one helper function, and it's the single feature that most convinces a clinic, a grader, or an investor that we took patient data seriously.
+
+**Suggested ownership** (one owner per area; everyone reviews everyone; security work is **always pair-reviewed**):
 
 | Area | Owner | Assignments |
 |---|---|---|
-| Data access & CCHS | _teammate A_ | H05, H07 (CCHS side), H29 |
-| ML pipeline & models | _teammate B_ | H06, H08–H15 |
-| Backend & DB | _teammate C_ | H16–H20 |
-| Frontend | _teammate D_ | H21–H25 |
-| Foundation & delivery | shared (Haard leads) | H01–H04, H26–H30 |
+| Data access & CCHS | _teammate A_ | H05, H07 (CCHS side), H29, H36 (synthetic generator) |
+| ML pipeline & models | _teammate B_ | H06, H08–H15, H40, H46 |
+| Backend, DB & access control | _teammate C_ | H16–H20, H31–H35, H37–H39 |
+| Frontend | _teammate D_ | H21–H25, H41–H44 |
+| AI features | A + B | H45, H47 |
+| Foundation, delivery & pilot pack | shared (Haard leads) | H01–H04, H26–H30, H48 |
 
 ---
 
@@ -320,6 +379,10 @@ Starter decisions; each gets a short ADR in `docs/adr/`. **Challenge them.**
 - **ADR-0008 — Frontend:** Next.js (App Router, TypeScript) + **Recharts** (or Plotly.js if we need richer statistical charts; decided in H22).
 - **ADR-0009 — Deployment:** Vercel (frontend) + Render/Railway/Fly.io (backend + Postgres), free tiers.
 - **ADR-0010 — Stats are survey-weighted** when the source provides weights (CCHS); BRFSS rows carry weight 1.0.
+- **ADR-0011 — Auth & access control (H31):** three roles (admin, doctor, patient). Invite-only accounts (no public sign-up for doctors/admins). Maintained hashing + signed-token libraries, tokens in `httpOnly` cookies. **Authorization lives in the backend**, with record-level scoping (doctor → assigned patients only). Postgres row-level security is a stretch, not a requirement.
+- **ADR-0012 — Synthetic patients behind a swappable source (H35, H36):** the app reads patients only through a `PatientDataSource` interface. Today: a seeded synthetic generator. Later: a FHIR or CSV importer. Tables and field names follow the FHIR resources they map to (`Patient`, `Observation`, `Condition`, `MedicationStatement`) so real data maps without a redesign.
+- **ADR-0013 — LLM use (H45):** an `LLMProvider` interface; **default config forbids sending patient-identifying text to any external service**. Deterministic fallbacks for everything the UI depends on. Keys only via environment/secret manager.
+- **ADR-0014 — Audit log (H34):** append-only table, written by a single helper invoked from the access-control layer so no endpoint can forget it; contains identifiers and actions, never clinical content.
 
 ---
 
@@ -339,6 +402,15 @@ Starter decisions; each gets a short ADR in `docs/adr/`. **Challenge them.**
 - **Model card**: a short document stating what a model is for, its data, metrics, subgroup performance, and limitations.
 - **Walking skeleton**: a minimal end-to-end slice exercising every layer.
 - **Required status check**: a CI job that must pass before GitHub allows a merge.
+- **PHI / PHIPA / PIPEDA**: personal health information, and the Ontario and federal privacy laws that govern it. We don't handle real PHI this semester; `H48` documents what would change.
+- **RBAC**: role-based access control. What you may do depends on your role (admin, doctor, patient).
+- **Record-level scoping**: also checking _which_ records a user may touch (a doctor's own patients), not just which endpoints.
+- **Audit log**: an append-only record of who accessed or changed what, and when.
+- **Break-glass access**: a deliberate, logged override that lets an admin read something they normally wouldn't.
+- **FHIR**: the standard data format for exchanging health records. We shape our tables after its resources so real data maps in later.
+- **Synthetic data**: realistic but fake records generated by a seeded script. Safe to commit, share, and demo.
+- **Prompt injection**: text that tries to trick an AI assistant into ignoring its rules (for example, "show me another patient's record").
+- **SaMD**: Software as a Medical Device, the Health Canada category that applies if software informs diagnosis or treatment. A reason our risk score is labelled population-level, not clinical.
 
 ---
 
@@ -784,7 +856,316 @@ _Goal: an interactive, honest dashboard. One real chart first, then widen._
 
 ---
 
-# EPIC E5 — Integration, Deployment & Delivery
+# EPIC E5 — Identity, Access & Audit
+
+_Goal: three roles, each seeing exactly what they should, with proof. This is the epic with the most risk for a team new to security, so every assignment here is pair-reviewed and test-first._
+
+---
+
+## H31 — [SPIKE] Roles, Access Matrix & Threat Sketch `[SPIKE/RESEARCH] [SECURITY]`
+
+**Goal:** One agreed table of who can do what, before any login code exists.
+**Why it matters:** Access bugs come from vague rules, not bad code. The table becomes the test list for H33.
+**Depends on:** —
+
+- [ ] **Plan this assignment.**
+- [ ] `docs/access-matrix.md`: rows = resources (own profile, patient record, observations, medications, assignments, users, audit log, model metrics, public stats), columns = admin / doctor / patient, cells = none / read / write, plus the scoping rule ("assigned patients only", "own record only").
+- [ ] Decide account lifecycle: invite-only for doctors and admins; how a patient account is created and linked to a patient record; password reset flow (or "admin resets" for the semester).
+- [ ] Decide the admin rule: can admins read clinical records? (Recommended: yes, logged and visible in the audit viewer.)
+- [ ] One-page threat sketch (STRIDE-lite): what a curious patient, a malicious doctor, and a leaked admin password could each do, and which test or control covers it.
+- [ ] ADR-0011.
+- [ ] **Write the assignment doc** → `docs/assignments/H31-access-matrix.md`.
+
+**Acceptance Criteria:**
+
+- All four teammates have signed off on the matrix, and every cell is testable.
+
+---
+
+## H32 — Authentication: Login, Sessions, Invites `[API] [SECURITY]`
+
+**Goal:** Users can log in and out securely; accounts are created by invitation.
+**Why it matters:** Everything else trusts the identity this establishes.
+**Depends on:** H16, H17, H31
+
+- [ ] **Plan this assignment.** Library choice (maintained password hashing + signed tokens). **Do not hand-roll.** Record the choice in ADR-0011.
+- [ ] Tests first: wrong password rejected, same error for unknown user and wrong password (no user enumeration), expired token rejected, tampered token rejected, disabled user rejected.
+- [ ] `users` table (id, email, password_hash, role, is_active, created_at); passwords hashed with argon2 or bcrypt, never stored or logged in clear.
+- [ ] `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`; token in an `httpOnly`, `Secure`, `SameSite` cookie.
+- [ ] Invite flow: admin creates an invite; user sets a password via a one-time, expiring link (for the demo, the link may be printed in the backend log).
+- [ ] Login rate-limiting / temporary lockout after repeated failures.
+- [ ] Secrets (`JWT_SECRET` etc.) from environment; the app **refuses to start** in production mode with the default secret.
+- [ ] **Write the assignment doc** → `docs/assignments/H32-authentication.md`.
+
+**Acceptance Criteria:**
+
+- A user can log in and see their identity; every failure mode above has a test.
+
+---
+
+## H33 — Authorization: RBAC + Record-Level Scoping `[API] [SECURITY]`
+
+**Goal:** The backend enforces the access matrix on every request.
+**Why it matters:** This is the feature that decides whether the product is safe. It must be tested harder than anything else.
+**Depends on:** H32, H35
+
+- [ ] **Plan this assignment.**
+- [ ] Reusable dependencies: `current_user`, `require_role(...)`, and `get_accessible_patient(patient_id)` that returns the record or raises 403/404 according to role and assignment.
+- [ ] **Convert the matrix from H31 into a parametrized test suite** (role × endpoint × expected status). This is the core deliverable.
+- [ ] Must-pass tests: doctor A **cannot** read doctor B's patient; patient A **cannot** read patient B; patient **cannot** call doctor/admin endpoints; a deactivated doctor loses access immediately; an unauthenticated request gets 401 everywhere except the public stats and health endpoints.
+- [ ] Return 404 (not 403) when revealing that a record exists would itself leak information.
+- [ ] No endpoint accepts `role` or `doctor_id` from the request body for authorization decisions.
+- [ ] **Write the assignment doc** → `docs/assignments/H33-authorization.md`.
+
+**Acceptance Criteria:**
+
+- The access-matrix test suite is green in CI and fails if anyone removes a guard.
+
+---
+
+## H34 — Audit Log `[API] [SECURITY]`
+
+**Goal:** Every read or write of patient data leaves a tamper-evident trace.
+**Depends on:** H33
+
+- [ ] **Plan this assignment.**
+- [ ] `audit_events` table: id, timestamp, actor_user_id, actor_role, action (`read` / `create` / `update` / `delete` / `login` / `denied`), resource_type, resource_id, patient_id, request_id. **No clinical content, no passwords, no free text.**
+- [ ] One helper, called from the access-control layer (`get_accessible_patient` and write paths), so individual endpoints can't forget it.
+- [ ] The application database role has **INSERT and SELECT only** on this table (no UPDATE/DELETE).
+- [ ] Failed access attempts (`denied`) are logged.
+- [ ] Tests: a read creates exactly one event; a denied read creates a `denied` event; events contain no clinical fields.
+- [ ] **Write the assignment doc** → `docs/assignments/H34-audit-log.md`.
+
+---
+
+# EPIC E6 — Clinical Records (synthetic, swappable)
+
+_Goal: realistic patient data to build and demo against, shaped so real data can replace it._
+
+---
+
+## H35 — Clinical Data Model (FHIR-Shaped) `[API] [DATA]`
+
+**Goal:** Tables for patients, assignments, conditions, observations, and medications.
+**Why it matters:** Choosing names and structure now that mirror FHIR resources is what makes the later "replace synthetic with real" step a mapping job.
+**Depends on:** H17, H31
+
+- [ ] **Plan this assignment.** Keep it small: only what the demo screens need.
+- [ ] Tables: `patients` (incl. `is_synthetic`), `doctor_patients` (assignment), `conditions`, `observations` (type, value, unit, effective_at: BMI, HbA1c, glucose, systolic/diastolic BP), `medications` (name, dose, start/end, status).
+- [ ] Each table documents its FHIR counterpart in a comment and in `docs/data-dictionary.md`.
+- [ ] Access goes through a repository layer (`PatientRepository`), never raw SQL in endpoints.
+- [ ] Indexes on `doctor_patients(doctor_id)`, `observations(patient_id, effective_at)`.
+- [ ] **Write the assignment doc** → `docs/assignments/H35-clinical-model.md`.
+
+---
+
+## H36 — Synthetic Patient Generator + Swappable Source `[DATA]`
+
+**Goal:** `make seed-synthetic` creates a realistic, reproducible set of fake patients, doctors, and histories.
+**Depends on:** H35, H07
+
+- [ ] **Plan this assignment.** A small custom generator (seeded) is the default. Synthea (open-source FHIR generator) is an optional stretch.
+- [ ] Tests first: same seed gives identical output; values stay in valid ranges; every patient has `is_synthetic = true`; no real names or identifiers (use obviously fake ones).
+- [ ] Generate ~200 patients, 5–8 doctors, 1 admin; 2–3 years of observations per patient with plausible correlations (higher BMI tends to higher glucose/BP; trends drift over time); medications consistent with conditions.
+- [ ] Use the BRFSS/CCHS profile distributions so patient mix resembles the survey population.
+- [ ] `PatientDataSource` interface with `SyntheticSource` implemented; `FhirBundleSource` / `CsvSource` stubbed.
+- [ ] `docs/real-data-swap.md`: the exact steps and mapping table to replace synthetic with real data later.
+- [ ] Demo credentials generated into the seed script's output (never real emails; documented as demo-only).
+- [ ] **Write the assignment doc** → `docs/assignments/H36-synthetic-data.md`.
+
+**Acceptance Criteria:**
+
+- A fresh clone plus one command gives a database a teammate can log into as each role.
+
+---
+
+## H37 — Doctor API `[API]`
+
+**Depends on:** H33, H35, H36
+
+- [ ] **Plan this assignment.**
+- [ ] `GET /doctor/patients` (assigned only; search, filter by risk/condition; paginated).
+- [ ] `GET /doctor/patients/{id}`: demographics, conditions, medications, observation history, latest values.
+- [ ] `GET /doctor/patients/{id}/timeline` for chart-ready series.
+- [ ] `POST` / `PATCH` for notes or medication changes only if time allows. Read-only is acceptable for the semester.
+- [ ] 3–4 tests per endpoint, including scoping failures (H33).
+- [ ] **Write the assignment doc** → `docs/assignments/H37-doctor-api.md`.
+
+---
+
+## H38 — Patient API `[API]`
+
+**Depends on:** H33, H35, H36
+
+- [ ] **Plan this assignment.**
+- [ ] `GET /me/record`, `/me/medications`, `/me/observations`: own data only, with the patient id derived from the session, never from the URL.
+- [ ] Patient-friendly field names and units.
+- [ ] 3–4 tests per endpoint, including "cannot request someone else's id".
+- [ ] **Write the assignment doc** → `docs/assignments/H38-patient-api.md`.
+
+---
+
+## H39 — Admin API `[API]`
+
+**Depends on:** H33, H34
+
+- [ ] **Plan this assignment.**
+- [ ] Users: list, invite, deactivate/reactivate, change role.
+- [ ] Assignments: link and unlink doctor ↔ patient.
+- [ ] `GET /admin/audit` with filters (actor, patient, action, date range).
+- [ ] `GET /admin/system`: model version, data source, row counts, whether synthetic data is loaded.
+- [ ] Guardrail: an admin can't remove the last active admin.
+- [ ] 3–4 tests per endpoint, including "non-admin gets 403".
+- [ ] **Write the assignment doc** → `docs/assignments/H39-admin-api.md`.
+
+---
+
+# EPIC E7 — Role-Based Frontend
+
+_Goal: three clear experiences on one codebase._
+
+---
+
+## H40 — Patient Risk Context (population estimate + explanation) `[API] [ML] [ETHICS]`
+
+**Goal:** Bridge the survey model to an individual record, honestly labelled.
+**Depends on:** H14, H19, H35
+
+- [ ] **Plan this assignment.** Map a patient's fields to the model's canonical features (BMI, blood pressure status, age band, sex…). Document what _cannot_ be mapped (e.g. no lab values in the survey model).
+- [ ] `GET /patients/{id}/risk-context`: model estimate, top SHAP contributions, and **"patients like this"**: survey prevalence for the same age band, sex, and BMI band (weighted).
+- [ ] Response always includes a `limitations` field with the model-card text. UI cannot omit it.
+- [ ] Access through the same scoping as H33 (patient: own; doctor: assigned; admin: logged).
+- [ ] **Write the assignment doc** → `docs/assignments/H40-risk-context.md`.
+
+---
+
+## H41 — Frontend Auth & Role Shell `[UI] [SECURITY]`
+
+**Depends on:** H21, H32
+
+- [ ] **Plan this assignment.** **Cookie gotcha:** with the frontend on Vercel and the backend on another domain, browsers may block cross-site cookies. Plan for the Next.js app to **proxy API calls through its own domain** (rewrites) so the cookie is first-party. Test this on the deployed URLs early, not in the last week.
+- [ ] Login page, logout, session-expired handling.
+- [ ] Route guards by role (Next.js middleware): `/doctor/*`, `/patient/*`, `/admin/*`, with a 403 page. _These are for UX only; the backend is the real enforcement (H33)._
+- [ ] Role-specific navigation; persistent "demo data / not medical advice" banners.
+- [ ] No tokens in `localStorage`.
+- [ ] **Write the assignment doc** → `docs/assignments/H41-frontend-auth.md`.
+
+---
+
+## H42 — Doctor Workspace UI `[UI]`
+
+**Depends on:** H37, H40, H41
+
+- [ ] **Plan this assignment.**
+- [ ] Patient list (search, filter, risk badge), patient detail page.
+- [ ] Observation trend charts (BMI, HbA1c, BP over time), medication list, condition list.
+- [ ] Risk context panel: estimate, SHAP bars, "patients like this", limitations text.
+- [ ] Loading, empty, and error states; keyboard-usable; colour-blind-safe palette.
+- [ ] **Write the assignment doc** → `docs/assignments/H42-doctor-ui.md`.
+
+---
+
+## H43 — Patient Portal UI `[UI]`
+
+**Depends on:** H38, H40, H41
+
+- [ ] **Plan this assignment.** Plain language first; no raw model jargon.
+- [ ] "My summary", "My medications", "My trends", and an explanation of the risk estimate with the limitations visible.
+- [ ] Mobile-friendly (patients will use phones).
+- [ ] **Write the assignment doc** → `docs/assignments/H43-patient-ui.md`.
+
+---
+
+## H44 — Admin Console UI `[UI]`
+
+**Depends on:** H39, H41
+
+- [ ] **Plan this assignment.**
+- [ ] Users table (invite, deactivate, role), assignments editor, audit-log viewer with filters, system/model status panel.
+- [ ] Destructive actions ask for confirmation.
+- [ ] **Write the assignment doc** → `docs/assignments/H44-admin-ui.md`.
+
+---
+
+# EPIC E8 — AI Features
+
+_Goal: an explanation of predictions and an AI assistant, with safety built in rather than bolted on. Scope for this semester is **those two features only**._
+
+---
+
+## H45 — [SPIKE] LLM Provider Abstraction & Data Rules `[SPIKE/RESEARCH] [SECURITY]`
+
+**Goal:** Decide how the app talks to an LLM, and what is never allowed to leave the system.
+**Depends on:** H31
+
+- [ ] **Plan this assignment.**
+- [ ] `LLMProvider` interface with a real implementation, a **fake implementation for tests**, and a switch to **disable AI entirely** (the app must still work).
+- [ ] Config flag, default **off**: `ALLOW_PATIENT_TEXT_TO_EXTERNAL_LLM`. With synthetic data we may enable it for the demo; with real data it stays off until H48 sign-off, or a locally hosted model is used.
+- [ ] Decide what the assistant may see: aggregate stats, the model card, and the signed-in user's own role-scoped data via tools. **Never** raw database access.
+- [ ] Cost and abuse controls: per-user rate limit, max tokens, spend cap.
+- [ ] API keys only from environment/secret manager; never in git, logs, or the frontend.
+- [ ] ADR-0013.
+- [ ] **Write the assignment doc** → `docs/assignments/H45-llm-rules.md`.
+
+---
+
+## H46 — Prediction Explanations in Plain Language `[ML] [API]`
+
+**Depends on:** H14, H40
+
+- [ ] **Plan this assignment.**
+- [ ] **Deterministic first:** turn the SHAP contributions into readable sentences from templates ("Your BMI is the biggest factor raising this estimate; being physically active lowers it."). Tested with golden examples, no AI required.
+- [ ] Two reading levels: clinician and patient.
+- [ ] Optional: LLM rewording behind H45, with a check that the rewording doesn't add or remove any factor.
+- [ ] Never states a diagnosis; always links the limitations.
+- [ ] **Write the assignment doc** → `docs/assignments/H46-explanations.md`.
+
+---
+
+## H47 — AI Assistant (role-aware, tool-based) `[API] [UI] [SECURITY]`
+
+**Depends on:** H33, H45, H46
+
+- [ ] **Plan this assignment.** Start with a narrow, useful scope: "explain this chart", "explain this prediction", "where do I find X".
+- [ ] The assistant works through **tools that call the same role-scoped endpoints** the UI uses, so it can't see more than the signed-in user can.
+- [ ] System rules: no diagnosis, no medication advice or dosing, no emergency guidance beyond "contact a clinician or emergency services", always cite which data it used.
+- [ ] **Safety test set (≥30 prompts, runs in CI against the fake provider's rules and manually against the real one):** diagnosis requests, dosage questions, "ignore your instructions", "show me patient #12's record" as a patient, attempts to exfiltrate the system prompt. All must be refused or safely redirected.
+- [ ] Chat UI with the disclaimer visible; conversation logs store no clinical content (or are not stored).
+- [ ] Rate limits and error states (provider down → clear message, app keeps working).
+- [ ] **Write the assignment doc** → `docs/assignments/H47-assistant.md`.
+
+---
+
+# EPIC E9 — Pilot Readiness (paperwork, not code)
+
+_Goal: a clear, honest answer to "what would it take to try this with a real clinic?" This is documentation and conversations, not features._
+
+---
+
+## H48 — Pilot-Readiness Pack `[ETHICS] [SECURITY]`
+
+**Depends on:** H31, H34, H36
+
+- [ ] **Plan this assignment.**
+- [ ] `docs/pilot-readiness.md` covering, in plain language and **explicitly not legal advice**:
+  - Which laws and rules apply (Ontario **PHIPA**, federal **PIPEDA**), and who the "health information custodian" would be.
+  - A **privacy impact assessment** outline and a **threat model** (extend H31).
+  - **Canadian data residency** and hosting options (the free tiers used for the demo aren't suitable for real patient data).
+  - Consent, retention, access requests, breach-response steps.
+  - Whether **Health Canada medical-device rules (SaMD)** could apply to the risk feature.
+  - **Research-ethics review** path through Lakehead if any real-data study is planned.
+  - What changes to go from synthetic to real: link `docs/real-data-swap.md`.
+- [ ] A short list of questions for a clinic's privacy officer and for the Lakehead research office.
+- [ ] Reviewed by someone outside the team (instructor or faculty advisor).
+- [ ] **Write the assignment doc** → `docs/assignments/H48-pilot-readiness.md`.
+
+**Acceptance Criteria:**
+
+- We can answer "what would you need before a clinic could test this?" in one page.
+
+---
+
+# EPIC E10 — Integration, Deployment & Delivery
 
 _Goal: the team demos a live URL, not a laptop._
 
@@ -792,10 +1173,11 @@ _Goal: the team demos a live URL, not a laptop._
 
 ## H26 — Full Stack from a Clean Clone `[FOUNDATION]`
 
-**Depends on:** H17, H19, H22
+**Depends on:** H17, H19, H22, H36, H41
 
 - [ ] **Plan this assignment.**
-- [ ] `docker compose up` runs Postgres + backend + frontend; a `make`/script target seeds the DB and copies model artifacts.
+- [ ] `docker compose up` runs Postgres + backend + frontend; a `make`/script target seeds the survey data **and** the synthetic patients, and copies model artifacts.
+- [ ] A demo-accounts table in the README (admin / doctor / patient) clearly marked demo-only.
 - [ ] A teammate who didn't build it follows the README on a fresh clone and gets the dashboard running. **Fix every step they trip on.**
 - [ ] **Write the assignment doc** → `docs/assignments/H26-full-stack.md`.
 
@@ -809,6 +1191,8 @@ _Goal: the team demos a live URL, not a laptop._
 - [ ] Model artifacts reach the deployed backend (baked into the image, or downloaded at start from release assets/cloud storage). **Not via git.**
 - [ ] `.github/workflows/deploy.yml` (manual `workflow_dispatch`, guarded so it no-ops until secrets are set, like JobRovr's).
 - [ ] Seed the hosted DB; smoke-check `/health` after deploy.
+- [ ] Production config: strong random `JWT_SECRET` set in the host (the app refuses the default), HTTPS-only cookies, CORS limited to the frontend origin, login rate-limit on.
+- [ ] **Synthetic data only on the free tier.** Put "demo data" in the deployment's banner. No real patient data on this deployment, ever (see H48).
 - [ ] **Write the assignment doc** → `docs/assignments/H27-deploy-backend.md` (incl. how to redeploy).
 
 ---
@@ -818,7 +1202,8 @@ _Goal: the team demos a live URL, not a laptop._
 **Depends on:** H27
 
 - [ ] **Plan this assignment.**
-- [ ] Vercel project with root directory `frontend/`; `NEXT_PUBLIC_API_URL` set to the deployed backend; backend CORS allows the Vercel domain.
+- [ ] Vercel project with root directory `frontend/`; API calls proxied through the Vercel domain so login cookies are first-party (see H41); backend CORS allows the Vercel domain.
+- [ ] Log in as each of the three demo roles on the **deployed** URL, early, not in the last week.
 - [ ] Preview deploys per PR (Vercel default).
 - [ ] **Write the assignment doc** → `docs/assignments/H28-deploy-frontend.md`.
 
@@ -826,7 +1211,7 @@ _Goal: the team demos a live URL, not a laptop._
 
 ## H29 — CCHS Go/No-Go & Data Swap `[DATA] [ML]`
 
-**Depends on:** H05, H13 — **decide no later than ~week 5** so there's time to act.
+**Depends on:** H05, H13 — **decide by Fri 6 Nov** (end of week 3). After that, the CCHS swap competes with the clinical workspace for the same people. If H05 hasn't produced a file by then, the default is **no-go**: stay on BRFSS and document the limitation. The swap is a Stretch item (§6.1).
 
 - [ ] **Plan this assignment.** Go/no-go meeting; record in ADR-0003.
 - [ ] If **go**: implement `sources/cchs.py` + tests, add `--source cchs` to the pipeline, retrain, re-seed, update the model card and dashboard copy ("Canadian adults, CCHS 20XX").
@@ -840,7 +1225,8 @@ _Goal: the team demos a live URL, not a laptop._
 **Depends on:** all
 
 - [ ] **Plan this assignment.**
-- [ ] Demo script (5 min): problem → data → model comparison → live prediction with explanation → limitations.
+- [ ] Demo script (7 min, three roles): public dashboard → log in as **doctor** (patient list, timeline, risk context) → as **patient** (own record, plain-language explanation) → as **admin** (users, audit log showing the doctor's views) → AI assistant (including one refused unsafe request) → limitations and the pilot-readiness slide.
+- [ ] Rehearse on the **deployed** URL, with a fallback recording in case the free tier is asleep or down.
 - [ ] Final report assembled largely from the assignment docs, model card, and ADRs.
 - [ ] README final pass: live URLs, screenshots, how to reproduce every number in the report.
 - [ ] Retro: what we'd do differently.
@@ -852,13 +1238,22 @@ _Goal: the team demos a live URL, not a laptop._
 
 ### Appendix A — Dependency-Aware Suggested Order
 
-1. **Today, in parallel:** `H05` (CCHS chase, one person) ‖ `H01 → H02 → H03 → H04` (foundation).
-2. **Model on placeholder (M1):** `H06 → H07 → H08 → H09 → H10 → (H11 ‖ H12) → H13 → H14 → H15`.
-3. **Walking skeleton (M2):** `H16 → H17 → H18` ‖ `H21` → `H22` (first real chart) and `H19` (predict).
-4. **Widen (M3):** `H20`, `H23`, `H24`, `H25`.
-5. **Deliver (M4):** `H26 → H27 → H28`, `H29` (by week 5), `H30`.
+Four people means four lanes running in parallel. Times are the milestone weeks in §6.
+
+1. **Week 1: foundation and decisions.** `H05` (CCHS chase, one person) ‖ `H01 → H02 → H03 → H04` ‖ **`H31` (access matrix, everyone)** ‖ `H06` (load and profile).
+2. **Week 2: four lanes.**
+   - ML: `H07 → H08 → H09 → H10 → (H11 ‖ H12)`.
+   - Backend: `H16 → H17`, then start `H32` (auth).
+   - Frontend: `H21` (skeleton, then the shell with login in H41).
+   - Data: `H35` (clinical model) and the start of `H36` (generator).
+3. **Week 3: walking skeleton.** `H13 → H14`, `H18`, `H19`, `H22` (first real chart), `H33` (authorization tests), `H34` (audit), `H41` (login on the frontend). **CCHS go/no-go (`H29`) by 6 Nov.**
+4. **Weeks 4–5: clinical workspace.** `H36` done, `H37 ‖ H38 ‖ H39`, `H40`, `H42 ‖ H43 ‖ H44`, `H45`, `H46`; deploy early (`H26 → H27 → H28`).
+5. **Week 5–6: AI and polish.** `H47` (assistant), `H15`, `H20`, `H23–H25`.
+6. **Freeze Fri 27 Nov.** Then hardening, `H48` (pilot pack), `H30` (report, demo, rehearsal).
 
 > **Backend/frontend can start before the model is final:** H16, H17, H21 only need the canonical schema (H07), not a trained model.
+> **Security work (H32–H34) starts in week 2, not week 5.** It touches every endpoint, and it's the area where the team has the least experience, so it needs the most time and the most review.
+> **Deploy by week 4.** Cookie and CORS problems only show up on real domains.
 
 ### Appendix B — Definition-of-Done Checklist (lives in the PR template)
 
@@ -907,8 +1302,8 @@ _Goal: the team demos a live URL, not a laptop._
 
 ---
 
-_Total assignments: 30 (H01–H30) across 6 epics (E0–E5)._
-_Spike: H05 (CCHS access). Decision point: H29 (CCHS go/no-go, by ~week 5)._
+_Total assignments: 48 (H01–H48) across 11 epics (E0–E10)._
+_Spikes: H05 (CCHS access), H31 (access matrix), H45 (LLM rules). Decision points: H29 (CCHS go/no-go, by 6 Nov), feature freeze (27 Nov)._
 _Every assignment opens with `Plan this assignment` and closes with `Write the assignment doc` (docs/assignments/)._
 
 _Created: 2026-10-10 · Owner: HealthLens team (Haard Pathak + 3 teammates)_
