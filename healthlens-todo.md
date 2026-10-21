@@ -2,9 +2,9 @@
 
 > **Scope:** **HealthLens: An Interactive Analytics and Risk Prediction Dashboard for Public Health Data.** A course project (team of 4, due **December 2026**, whole platform graded) that we intend to carry forward toward a **beta pilot with a local clinic or the regional hospital**. The pilot is _not_ part of this semester; we build so it is possible and document what it would take (`H48`).
 > **Two layers, one product:**
-> 1. **Public-health analytics (no personal data):** survey microdata → cleaning & features → Logistic Regression baseline vs. XGBoost → SHAP → FastAPI + PostgreSQL → Next.js dashboard.
+> 1. **Public-health analytics (no personal data), for many chronic conditions, not just diabetes:** survey microdata → cleaning & features → per-condition Logistic Regression baseline vs. XGBoost → SHAP → FastAPI + PostgreSQL → Next.js dashboard. A **condition registry** (`H49`) makes adding a condition a config change, not a rewrite. **Three conditions get the full treatment, six more run through the same pipeline** (§5.4), and a **release gate** (`H50`) decides which conditions are allowed to show individual predictions.
 > 2. **Clinical workspace (synthetic patients only for now):** three roles: **admin, doctor, patient**, with login, role-based access, patient records, medications, progress timelines, prediction explanations, and an AI assistant. Synthetic data sits behind a swappable source layer so real data can replace it later.
-> **Data:** survey side starts on the **CDC BRFSS "Diabetes Health Indicators"** placeholder (Kaggle) and swaps to **Statistics Canada CCHS PUMF** if access is confirmed. Patient side uses a **seeded synthetic generator** (`H36`). Both swaps must be _mapping exercises, not rewrites_. That constraint shapes the design.
+> **Data:** survey side uses the **CDC BRFSS annual survey file** (it asks about many conditions in one file, with real survey weights), and optionally swaps to **Statistics Canada CCHS PUMF** if access is confirmed. The Kaggle "Diabetes Health Indicators" file is a diabetes-only quick-start for the first days. Patient side uses a **seeded synthetic generator** (`H36`). Both swaps must be _mapping exercises, not rewrites_. That constraint shapes the design.
 > **Hard rule:** no real patient data enters this project, its database, its git history, or any external AI service, until the pilot-readiness work (`H48`) is done and a clinic's privacy officer has agreed in writing.
 > This document is the **plan and source of truth**. Each assignment (`H##`) becomes one GitHub Issue. IDs are stable labels, not an ordering; order comes from `Depends on:` and Appendix A.
 
@@ -179,7 +179,9 @@ graph TB
         RAW[("data/raw/<br/>BRFSS or CCHS CSV<br/>(gitignored)")]
         ADP["Source adapter<br/>brfss.py | cchs.py"]
         CLN["clean.py + features.py<br/>(canonical schema)"]
-        TRN["train.py<br/>LogReg · XGBoost · (LightGBM)"]
+        REG["Condition registry<br/>(conditions.yaml)"]
+        TRN["train.py<br/>loops over conditions<br/>LogReg · XGBoost · (LightGBM)"]
+        REG --> TRN
         EXP["explain.py<br/>SHAP global + local"]
         ART[("ml/models/<br/>model.joblib · metrics.json<br/>model_meta.json (gitignored)")]
         RAW --> ADP --> CLN --> TRN --> ART
@@ -203,9 +205,9 @@ graph TB
 
 ```mermaid
 flowchart LR
-    B["BRFSS CSV<br/>HighBP, BMI, Age(1–13)…"] -->|brfss.py| C
+    B["BRFSS annual file<br/>condition questions, BMI, age band…"] -->|brfss.py| C
     S["CCHS PUMF CSV<br/>CCC_*, HWTDGBMI, codes 6/7/8/9…"] -->|cchs.py| C
-    C["Canonical DataFrame<br/>high_bp, bmi, age_band, …, diabetes, weight"]
+    C["Canonical DataFrame<br/>bmi, age_band, …, one outcome column per condition, weight"]
     C --> V{"validate_schema()<br/>types · ranges · required cols"}
     V --> F["features.py<br/>bmi_band, risk-factor count, …"]
     F --> M["models"]
@@ -219,8 +221,10 @@ erDiagram
         int id PK
         text source "brfss | cchs"
         int survey_cycle
-        float survey_weight "1.0 for BRFSS"
-        bool diabetes
+        float survey_weight "BRFSS final weight"
+        bool diabetes "one boolean column per condition in the registry"
+        bool hypertension
+        bool heart_disease
         float bmi
         text bmi_band
         bool high_bp
@@ -283,13 +287,16 @@ flowchart TB
 
 Every request passes the same three checks in the same order. The AI assistant is just another client of this layer, so it can never see more than the signed-in user.
 
-## 5. The Data: BRFSS placeholder → CCHS target
+## 5. The Data: BRFSS (multi-condition) → optional CCHS
 
-### 5.1 BRFSS "Diabetes Health Indicators" (Kaggle) — start here today
+### 5.1 CDC BRFSS annual file: the main source for many conditions
 
-- Three CSVs in the download. **Use `diabetes_binary_health_indicators_BRFSS2015.csv` as the main dataset**: it keeps the real class imbalance (~14% positive), so its metrics are honest. The `5050split` file is useful for experiments, but **never report test metrics from a balanced file** as if they describe the real population.
-- 21 features, already numerically coded (e.g. `Age` is 13 bands, `Income` 8 bands, `GenHlth` 1–5). It is **already cleaned**: few or no NaNs and no sentinel codes. So `clean.py` will be thin for BRFSS, and the sentinel-code logic is really written _for CCHS_. Test it with synthetic CCHS-shaped rows.
-- **Check for duplicate rows during profiling.** Many respondents share identical coded answers. Decide (and record in an ADR) whether to deduplicate before splitting.
+- The CDC publishes the Behavioral Risk Factor Surveillance System each year (several hundred thousand respondents, a few hundred columns). Its core questionnaire asks about **diabetes, high blood pressure, high cholesterol, heart attack, coronary heart disease, stroke, asthma, COPD, arthritis, kidney disease, depression, and cancers**, plus the lifestyle and demographic factors we use as predictors. **Confirm each variable's exact name and coding in that year's codebook**: names and codes change between years, so never copy them from memory.
+- Download a **recent year** from the CDC BRFSS annual-data page (link in Appendix D). Files come as SAS transport (`.XPT`) or fixed-width text; pandas can read XPT. It is a large file (hundreds of MB): `data/raw/`, never git.
+- **Real survey weights exist** (a "final weight" variable). Dashboard prevalence should be **weighted**; model training may be unweighted (state it in the model card).
+- **This file is raw, so `clean.py` has real work to do:** BRFSS uses sentinel codes (7 = don't know, 9 = refused, and 77/99/777/999 on wider fields), blank = not asked or missing, and survey-design skip patterns. The sentinel logic isn't only for CCHS.
+- **Quick-start fallback:** the Kaggle "Diabetes Health Indicators" CSVs (2015 data, already cleaned, diabetes only) let the team write and test the pipeline in the first days while the full file downloads. **Never report test metrics from the balanced `5050split` file** as if they describe the real population; use the imbalanced file.
+- **Check for duplicate rows during profiling** and decide (record in an ADR) whether to deduplicate before splitting.
 
 ### 5.2 CCHS PUMF — the real target
 
@@ -305,10 +312,10 @@ Every request passes the same three checks in the same order. The AI assistant i
 
 | Canonical name | Type | BRFSS source | CCHS source (TBD in H07) |
 |---|---|---|---|
-| `diabetes` (target) | bool | `Diabetes_binary` | chronic-conditions module |
-| `bmi` | float | `BMI` | derived BMI |
-| `high_bp` | bool | `HighBP` | chronic-conditions module |
-| `high_chol` | bool | `HighChol` | (may be unavailable — document) |
+| _outcomes (one boolean per condition: `diabetes`, `hypertension`, `heart_disease`, …, see §5.4)_ | bool | the condition questions in the BRFSS core module | chronic-conditions module |
+| `bmi` | float | BMI (derived) | derived BMI |
+| `high_bp` | bool | high-blood-pressure question (also an outcome in §5.4) | chronic-conditions module |
+| `high_chol` | bool | high-cholesterol question (also an outcome in §5.4) | (may be unavailable — document) |
 | `smoker` | bool | `Smoker` | smoking module |
 | `phys_active` | bool | `PhysActivity` | physical-activity derived var |
 | `fruits_veg` | bool / int | `Fruits`, `Veggies` | fruit & vegetable module |
@@ -318,9 +325,23 @@ Every request passes the same three checks in the same order. The AI assistant i
 | `sex` | category | `Sex` | sex |
 | `income_band` | category | `Income` | household income (re-band) |
 | `education_band` | category | `Education` | education (re-band) |
-| `survey_weight` | float | constant `1.0` | survey weight variable |
+| `survey_weight` | float | BRFSS final weight (`1.0` only for the Kaggle quick-start file) | survey weight variable |
 
 > Features available in only one source get a **feature-availability flag** in the schema, so the model trained on CCHS simply doesn't receive them. Don't impute an entire missing column.
+>
+> **A condition is either an outcome or a predictor, never both for the same model.** `high_bp` and `high_chol` are outcomes (hypertension, high cholesterol) _and_ useful predictors for other conditions. The registry (H49) lists, per condition, which columns are **excluded** from its model, so a hypertension model can't "predict" hypertension from `high_bp`.
+
+### 5.4 Condition catalogue and tiers
+
+Variety without a pile of weak models: every condition goes through the **same pipeline**, but effort and exposure differ by tier.
+
+| Tier | Conditions | Treatment |
+|---|---|---|
+| **1: full** | Diabetes · Hypertension (high blood pressure) · Heart disease (heart attack or coronary heart disease) | Tuned LR vs. XGBoost (± LightGBM), SHAP, subgroup analysis, hand-reviewed model card, dashboard + individual prediction |
+| **2: standard** | Stroke · Asthma · COPD · Arthritis · Chronic kidney disease · Depression | Same pipeline with default settings, LR + XGBoost, auto-generated model card, population dashboard; individual prediction only if the **release gate** (H50) passes |
+| **3: later** | Cancers, high cholesterol as an outcome, others from the registry | Not scheduled. Adding one is a registry entry plus a training run. |
+
+**Honest expectations:** lifestyle and demographic factors predict some conditions well (diabetes, hypertension) and others weakly (asthma, depression). Weak signal is a _finding_, not a failure: we report it, show a "signal strength" label, and the release gate keeps weak or sensitive models from producing individual predictions. **Obesity is not an outcome**: BMI is one of our predictors, so predicting it would be circular.
 
 ---
 
@@ -346,9 +367,11 @@ With ~7 weeks, a team still learning auth and security, and the whole platform g
 
 | Tier | Assignments | Rule |
 |---|---|---|
-| **Must** (the graded product) | H01–H04, H06–H14, H16–H19, H21, H22, H31–H36, H37, H38, H41–H43, H46, H26–H28, H30 | Everything else depends on these. |
-| **Should** | H15, H20, H23, H24, H25, H39, H40, H44, H45, H47, H48 | Strong marks if they land; each one is independently droppable. |
-| **Stretch** | H29 (CCHS swap, only if H05 succeeds), LightGBM in H12, Synthea import, 2FA, row-level security in Postgres | Only with spare time after the freeze plan is safe. |
+| **Must** (the graded product) | H01–H04, H06–H14, **H49**, H16–H19, H21, H22, H31–H36, H37, H38, H41–H43, H46, H26–H28, H30 | Everything else depends on these. |
+| **Should** | H15, H20, H23, H24, H25, H39, H40, H44, H45, H47, H48, H50 | Strong marks if they land; each one is independently droppable. |
+| **Stretch** | H29 (CCHS swap, only if H05 succeeds), LightGBM in H12, Tier 3 conditions (§5.4), Synthea import, 2FA, row-level security in Postgres | Only with spare time after the freeze plan is safe. |
+
+> **Multi-condition scope rule.** The registry (H49) is **Must**, with the three Tier 1 conditions fully done. **Tier 2 conditions are "as many as are ready by the freeze"**: each one that passes through the pipeline and gets a model card ships; any that don't are simply left out of the dropdown. Nothing else depends on how many Tier 2 conditions land. (Tier 1 conditions: diabetes, hypertension, heart disease. Tier 2: stroke, asthma, COPD, arthritis, kidney disease, depression.)
 
 > **Why audit logging (H34) is Must:** it's one table plus one helper function, and it's the single feature that most convinces a clinic, a grader, or an investor that we took patient data seriously.
 
@@ -357,7 +380,7 @@ With ~7 weeks, a team still learning auth and security, and the whole platform g
 | Area | Owner | Assignments |
 |---|---|---|
 | Data access & CCHS | _teammate A_ | H05, H07 (CCHS side), H29, H36 (synthetic generator) |
-| ML pipeline & models | _teammate B_ | H06, H08–H15, H40, H46 |
+| ML pipeline & models | _teammate B_ | H06, H08–H15, H40, H46, H49, H50 |
 | Backend, DB & access control | _teammate C_ | H16–H20, H31–H35, H37–H39 |
 | Frontend | _teammate D_ | H21–H25, H41–H44 |
 | AI features | A + B | H45, H47 |
@@ -371,14 +394,16 @@ Starter decisions; each gets a short ADR in `docs/adr/`. **Challenge them.**
 
 - **ADR-0001 — Monorepo** (`data/`, `ml/`, `backend/`, `frontend/`) with one CI workflow and path-based job filtering.
 - **ADR-0002 — Python 3.12** for `ml/` and `backend/`; **ruff** for lint + format; **pytest** for tests; plain `requirements.txt` (pinned).
-- **ADR-0003 — BRFSS as placeholder, CCHS as target**, isolated behind source adapters + a canonical schema. Go/no-go on CCHS decided in `H29`.
+- **ADR-0003 — BRFSS (annual file) as the main source, CCHS optional**, isolated behind source adapters + a canonical schema. Go/no-go on CCHS decided in `H29`; it is a Stretch item.
 - **ADR-0004 — Models:** Logistic Regression baseline (interpretable floor) → XGBoost (primary) → LightGBM (optional). Selected on **ROC-AUC and PR-AUC on a held-out test set**, with calibration checked.
 - **ADR-0005 — Explainability:** SHAP `TreeExplainer` for tree models (exact and fast enough per request); coefficients / `LinearExplainer` for LR.
 - **ADR-0006 — Serving:** the backend **loads saved artifacts** at startup (joblib); it never retrains per request.
 - **ADR-0007 — Backend:** FastAPI + PostgreSQL 16 + SQLAlchemy; schema created by a migration (Alembic) or a single `schema.sql`, decided in H17.
 - **ADR-0008 — Frontend:** Next.js (App Router, TypeScript) + **Recharts** (or Plotly.js if we need richer statistical charts; decided in H22).
 - **ADR-0009 — Deployment:** Vercel (frontend) + Render/Railway/Fly.io (backend + Postgres), free tiers.
-- **ADR-0010 — Stats are survey-weighted** when the source provides weights (CCHS); BRFSS rows carry weight 1.0.
+- **ADR-0010 — Stats are survey-weighted** using the source's final weight (BRFSS and CCHS both provide one); only the Kaggle quick-start file carries weight 1.0.
+- **ADR-0015 — Condition registry (H49):** one `conditions.yaml` lists every condition: outcome column, columns excluded from its model, display copy, tier, and whether individual prediction is allowed. Training, API, and UI read it; **no code mentions a specific disease**.
+- **ADR-0016 — Prediction release gate (H50):** a condition may show individual predictions only if its held-out ROC-AUC and calibration pass agreed thresholds and it isn't flagged sensitive (for example, mental health). Otherwise it is **analytics-only**. The UI shows a signal-strength label either way.
 - **ADR-0011 — Auth & access control (H31):** three roles (admin, doctor, patient). Invite-only accounts (no public sign-up for doctors/admins). Maintained hashing + signed-token libraries, tokens in `httpOnly` cookies. **Authorization lives in the backend**, with record-level scoping (doctor → assigned patients only). Postgres row-level security is a stretch, not a requirement.
 - **ADR-0012 — Synthetic patients behind a swappable source (H35, H36):** the app reads patients only through a `PatientDataSource` interface. Today: a seeded synthetic generator. Later: a FHIR or CSV importer. Tables and field names follow the FHIR resources they map to (`Patient`, `Observation`, `Condition`, `MedicationStatement`) so real data maps without a redesign.
 - **ADR-0013 — LLM use (H45):** an `LLMProvider` interface; **default config forbids sending patient-identifying text to any external service**. Deterministic fallbacks for everything the UI depends on. Keys only via environment/secret manager.
@@ -395,7 +420,10 @@ Starter decisions; each gets a short ADR in `docs/adr/`. **Challenge them.**
 - **Survey weight**: how many people in the population a respondent represents. Needed for population estimates.
 - **Canonical schema**: our own source-independent column names/types that every data source is mapped onto.
 - **Data leakage**: information from the test set (or the future) leaking into training, which inflates scores.
-- **Class imbalance**: one outcome is much rarer (diabetes ≈ 14%). Accuracy becomes misleading; use recall, PR-AUC.
+- **Class imbalance**: one outcome is much rarer (diabetes ≈ 14% in the Kaggle data; stroke and others are rarer still). Accuracy becomes misleading; use recall, PR-AUC.
+- **Condition registry**: the config file that defines every condition we model, so adding one never needs code changes.
+- **Release gate**: the rule that decides whether a condition may show individual predictions or stays analytics-only.
+- **Signal strength**: a plain label (strong / moderate / weak) derived from a model's held-out performance, shown next to every prediction.
 - **ROC-AUC / PR-AUC**: ranking quality across all thresholds; PR-AUC is more informative when positives are rare.
 - **Calibration / Brier score**: does a predicted 30% risk actually happen ~30% of the time?
 - **SHAP**: SHapley Additive exPlanations. Splits one prediction into per-feature contributions.
@@ -557,7 +585,8 @@ _Goal: raw survey file → validated, canonical, model-ready DataFrame, with the
 **Depends on:** H01
 
 - [ ] **Plan this assignment.**
-- [ ] Download the Kaggle BRFSS dataset into `data/raw/` (document the exact file names in the README).
+- [ ] Download a **recent CDC BRFSS annual file** into `data/raw/` (large; document the year and exact file name in the README). Use the Kaggle diabetes CSV only as a quick-start while it downloads.
+- [ ] From that year's codebook, list the variable name and coding for **every condition in §5.4 and every predictor in §5.3**. This list feeds H07 and H49.
 - [ ] Write tests first (`ml/tests/test_load_data.py`) using a tiny synthetic CSV fixture: loads, reports correct row count, detects class balance.
 - [ ] `ml/src/load_data.py`: `load_raw(path) -> DataFrame` and a `profile(df, target) -> dict` used by the CLI printout.
 - [ ] Profile includes: shape, dtypes, NaN counts, **sentinel-code candidates** (values like 7/9/77/99 in categorical cols), duplicate rows, class balance.
@@ -578,7 +607,7 @@ _Goal: raw survey file → validated, canonical, model-ready DataFrame, with the
 
 - [ ] **Plan this assignment.** Finalise the canonical feature list (§5.3) as a team.
 - [ ] `ml/src/schema.py`: canonical column names, dtypes, allowed ranges/categories, required vs optional; `validate_schema(df)` raising clear errors.
-- [ ] `ml/src/sources/brfss.py`: `to_canonical(raw_df) -> DataFrame` (renames, recodes bands, sets `survey_weight = 1.0`).
+- [ ] `ml/src/sources/brfss.py`: `to_canonical(raw_df) -> DataFrame` (renames, recodes bands, maps the **final weight** to `survey_weight`, and produces **one boolean outcome column per condition** in §5.4: yes → True, no → False, don't know / refused / not asked → missing).
 - [ ] `ml/src/sources/cchs.py`: stub with the mapping table filled in from H05 (implemented in H29 if CCHS is a go).
 - [ ] Tests first: each adapter maps a hand-written 5-row raw fixture to the expected canonical frame; `validate_schema` rejects out-of-range BMI, unknown categories, missing target.
 - [ ] `docs/data-dictionary.md`: canonical name → meaning → BRFSS source → CCHS source.
@@ -597,6 +626,7 @@ _Goal: raw survey file → validated, canonical, model-ready DataFrame, with the
 
 - [ ] **Plan this assignment.** Decide: dedupe or not; valid-skip handling; imputation strategy (inside the model pipeline, not here).
 - [ ] Tests first: sentinel codes (6/7/8/9, 96–99, 996–999) become NaN **per a per-variable code table**, not a global "replace 9 everywhere" (9 can be a real value); valid skips map to "not applicable"; output passes `validate_schema`.
+- [ ] **Missing outcome ≠ "no".** A respondent who skipped or refused the asthma question is dropped from the asthma model's training set, never counted as "no asthma". Test this per condition.
 - [ ] `ml/src/clean.py`: `clean(df) -> DataFrame`, pure function, no I/O; a `main()` that reads raw → adapter → clean → writes `data/processed/<source>_clean.parquet`.
 - [ ] Log what was changed (rows dropped, values recoded, per column).
 - [ ] **Write the assignment doc** → `docs/assignments/H08-clean.md`.
@@ -637,7 +667,7 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Depends on:** H09
 
 - [ ] **Plan this assignment.**
-- [ ] Stratified train/test split (e.g. 80/20) with a fixed seed, **after** dedup.
+- [ ] Stratified train/test split (e.g. 80/20) with a fixed seed, **after** dedup. **One split per condition**: rows with a missing outcome for that condition are dropped first, and the same respondents should land in test across conditions where possible.
 - [ ] `ml/src/evaluate.py`: `evaluate(model, X_test, y_test) -> dict` returning accuracy, precision, recall, F1, **ROC-AUC, PR-AUC, Brier score**, confusion matrix, and the threshold used.
 - [ ] Threshold policy: report at 0.5 **and** at a recall-oriented threshold chosen on validation data (screening tools favour recall). Document the choice.
 - [ ] Tests: metrics on a hand-computed tiny example; keys present; values in valid ranges.
@@ -673,13 +703,13 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 
 ## H13 — Training Entry Point, Artifacts & `metrics.json` (`train.py`) `[ML]`
 
-**Goal:** `python ml/src/train.py` trains every model end-to-end and saves artifacts the backend loads.
-**Depends on:** H11, H12
+**Goal:** `python ml/src/train.py` trains every model for every condition end-to-end and saves artifacts the backend loads.
+**Depends on:** H11, H12, H49
 
 - [ ] **Plan this assignment.**
-- [ ] `train.py`: load processed data → split → train each model → evaluate → save `ml/models/<name>.joblib`.
-- [ ] `ml/models/metrics.json`: per-model metrics, plus `best_model` and selection criterion.
-- [ ] `ml/models/model_meta.json`: data source, row counts, feature list (canonical order), seed, library versions, git SHA, timestamp. The backend validates requests against this feature list.
+- [ ] `train.py`: load processed data → **for each condition in the registry (H49)** → split → train each model → evaluate → save `ml/models/<condition>/<name>.joblib`. `python ml/src/train.py --condition diabetes` trains one; no flag trains all.
+- [ ] `ml/models/<condition>/metrics.json`: per-model metrics, plus `best_model` and selection criterion; a top-level `ml/models/index.json` lists every trained condition.
+- [ ] `ml/models/<condition>/model_meta.json`: condition, data source, row counts, feature list (canonical order, **after the registry's exclusions**), seed, library versions, git SHA, timestamp. The backend validates requests against this feature list.
 - [ ] Smoke test: `train.py` runs end-to-end on a 300-row synthetic dataset in CI (< 30 s) and writes valid JSON.
 - [ ] **Write the assignment doc** → `docs/assignments/H13-train.md`.
 
@@ -695,7 +725,7 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Depends on:** H13
 
 - [ ] **Plan this assignment.**
-- [ ] `explain.py`: load XGBoost → `shap.TreeExplainer` → global summary (beeswarm) + bar plot saved to `docs/figures/`.
+- [ ] `explain.py --condition <name>`: load that condition's XGBoost → `shap.TreeExplainer` → global summary (beeswarm) + bar plot saved to `docs/figures/<condition>/`.
 - [ ] `explain_one(row) -> list[{feature, value, contribution}]` sorted by absolute contribution. **This exact function is what `/predict` calls.**
 - [ ] Map one-hot/encoded columns **back to canonical feature names** so explanations read "BMI", not `num__bmi`.
 - [ ] Sanity test: base value + sum of contributions ≈ model margin output for a sample row.
@@ -709,11 +739,50 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Depends on:** H13, H14
 
 - [ ] **Plan this assignment.**
-- [ ] Metrics by `sex`, `age_band`, `income_band` (recall, PR-AUC, calibration per group).
+- [ ] Metrics by `sex`, `age_band`, `income_band` (recall, PR-AUC, calibration per group), **for the three Tier 1 conditions**. Tier 2 conditions get overall metrics and a generated card (H49).
 - [ ] Calibration plot for LR vs XGBoost.
-- [ ] `docs/model-card.md`: intended use, not-intended use, data, metrics, subgroup results, limitations (self-reported, cross-sectional, US BRFSS ≠ Canadian population until CCHS swap).
+- [ ] `docs/model-cards/<condition>.md` for each Tier 1 condition: intended use, not-intended use, data, metrics, subgroup results, limitations (self-reported, cross-sectional, US BRFSS ≠ Canadian population unless CCHS lands). Tier 2 cards are generated from `metrics.json` plus the registry's text.
 - [ ] Plain-language limitations text that the frontend will show (H25).
 - [ ] **Write the assignment doc** → `docs/assignments/H15-model-card.md`.
+
+---
+
+## H49 — Condition Registry & Per-Condition Pipeline `[ML] [DATA]`
+
+**Goal:** One config file defines every condition; training, API, and UI all read it. Adding a condition means adding an entry, not writing code.
+**Why it matters:** This is the decision that makes "many diseases" affordable. Without it, each new condition costs a copy-pasted pipeline and a pile of `if condition == …`.
+**Depends on:** H07, H09
+
+- [ ] **Plan this assignment.** Agree the Tier 1 and Tier 2 lists (§5.4) as a team, and the registry's fields.
+- [ ] `ml/src/conditions.yaml` (or `.json`): per condition: `id`, `display_name`, `body_system`, `tier`, `outcome_column` (canonical name), `exclude_features` (the outcome itself plus anything that defines it, e.g. `high_bp` for hypertension), `sensitive` (true for depression), patient-facing and clinician-facing wording, and a short plain-language "what this is".
+- [ ] `ml/src/registry.py`: loads and **validates** the file (every `outcome_column` exists in the canonical schema; no condition lists its own outcome as a feature; ids are unique). Fails loudly with a clear message.
+- [ ] Tests first: a registry that excludes nothing for hypertension is rejected; an unknown outcome column is rejected; a valid 2-condition registry loads; no module outside `registry.py` hard-codes a disease name (enforce with a grep test, like H07).
+- [ ] Generalise `train.py`, `explain.py`, `evaluate.py` to take `--condition` (H13/H14 reference this).
+- [ ] **Auto-generated model card** for each condition from `metrics.json` and the registry text (the Tier 2 path; Tier 1 cards are then hand-edited in H15).
+- [ ] Start with **diabetes only** in the registry and get it green end-to-end, then add hypertension and heart disease, then the Tier 2 six. If a condition's data can't be mapped cleanly by the freeze, leave it out.
+- [ ] **Write the assignment doc** → `docs/assignments/H49-condition-registry.md`.
+
+**Acceptance Criteria:**
+
+- Adding a new condition to the registry, plus its mapping in `sources/brfss.py`, is enough to get a trained model, a metrics file, a model card, and an entry in `/conditions`. No other code changes.
+
+---
+
+## H50 — Prediction Release Gate & Signal Strength `[ML] [ETHICS]`
+
+**Goal:** A written, automatic rule for which conditions may show individual predictions, so weak or sensitive models can't mislead users.
+**Why it matters:** A model with ROC-AUC 0.58 that still prints "your risk is 34%" is worse than no model. This is where we show judgement, and it's the answer to "why not predict everything?".
+**Depends on:** H13, H49
+
+- [ ] **Plan this assignment.** Agree thresholds as a team and write them in ADR-0016. Suggested starting point: held-out ROC-AUC ≥ 0.70, calibration better than the no-skill baseline (Brier), and `sensitive: false`. Revisit after seeing real numbers.
+- [ ] `ml/src/gate.py`: reads each condition's `metrics.json` and the registry, writes `prediction_enabled`, `signal_strength` (strong ≥ 0.80, moderate 0.70–0.80, weak < 0.70; adjust with the team), and the reason, into `ml/models/index.json`.
+- [ ] Tests first: a synthetic metrics file below the threshold is disabled; a sensitive condition is disabled regardless of score; reasons are human-readable.
+- [ ] The API and UI only _read_ this result (H19, H24, H25, H40); they never re-implement the rule.
+- [ ] **Write the assignment doc** → `docs/assignments/H50-release-gate.md`.
+
+**Acceptance Criteria:**
+
+- Every condition in the dropdown shows either a prediction form with a signal-strength label, or an explicit "population analytics only" notice with the reason.
 
 ---
 
@@ -738,10 +807,11 @@ _Goal: serve dashboard stats from Postgres and predictions + explanations from t
 
 ## H17 — Postgres Schema & Seed Script `[API] [DATA]`
 
-**Depends on:** H08, H16
+**Depends on:** H08, H16, H49
 
-- [ ] **Plan this assignment.** Alembic vs a single `schema.sql`. Choose and write an ADR.
-- [ ] `respondents` table per §4.3, with **indexes on every column you GROUP BY / filter on**.
+- [ ] **Plan this assignment.** Alembic vs a single `schema.sql`. Choose and write an ADR. Also decide **wide vs long** for outcomes (one boolean column per condition, which is simple and fast for ~10 conditions, vs a separate respondent-condition table). Recommended: wide.
+- [ ] `respondents` table per §4.3 with **one outcome column per registry condition** (generated from `conditions.yaml`, not hand-typed), with **indexes on every column you GROUP BY / filter on**.
+- [ ] A `conditions` table seeded from the registry (id, display name, tier, `prediction_enabled`, signal strength) so the API and UI can list conditions without reading files.
 - [ ] `backend/scripts/seed.py`: loads `data/processed/*_clean.parquet` into Postgres (idempotent: truncate + bulk insert via `COPY`).
 - [ ] Integration test against the CI Postgres service: seed a 50-row fixture, count rows.
 - [ ] **Write the assignment doc** → `docs/assignments/H17-schema-seed.md`.
@@ -753,7 +823,8 @@ _Goal: serve dashboard stats from Postgres and predictions + explanations from t
 **Depends on:** H17
 
 - [ ] **Plan this assignment.** List the charts first, then design one endpoint per chart _shape_ (not per chart).
-- [ ] `GET /api/v1/stats/prevalence?by=bmi_band|age_band|phys_active|…&filter…` → `[{group, n, diabetes_rate}]`, **weighted by `survey_weight`**.
+- [ ] `GET /api/v1/conditions` → the registry (id, name, tier, `prediction_enabled`, signal strength).
+- [ ] `GET /api/v1/stats/prevalence?condition=<id>&by=bmi_band|age_band|phys_active|…&filter…` → `[{group, n, rate}]`, **weighted by `survey_weight`**. `condition` must be a registry id (reject anything else); the column name comes from the registry, never from user input.
 - [ ] Whitelist `by` / filter columns (never interpolate user input into SQL).
 - [ ] Suppress groups with tiny `n` (e.g. < 30) to avoid misleading rates (and for privacy).
 - [ ] 3–4 integration tests per endpoint (happy path, invalid `by`, empty filter result, weighting correctness).
@@ -766,10 +837,10 @@ _Goal: serve dashboard stats from Postgres and predictions + explanations from t
 **Depends on:** H14, H16
 
 - [ ] **Plan this assignment.**
-- [ ] Load model + `model_meta.json` once at startup (FastAPI lifespan); fail fast if missing.
-- [ ] `POST /api/v1/predict`: Pydantic request model generated from the canonical schema (ranges, enums) → `{risk, risk_band, contributions[], model_name, model_version, disclaimer}`.
+- [ ] Load **every enabled condition's** model + `model_meta.json` once at startup (FastAPI lifespan); fail fast if an enabled one is missing.
+- [ ] `POST /api/v1/predict`: body includes `condition`; Pydantic request model generated from that condition's feature list (ranges, enums) → `{condition, risk, risk_band, contributions[], model_name, model_version, signal_strength, disclaimer}`. If the condition is analytics-only (H50), return a clear 409/422 explaining why, never a number.
 - [ ] Reuse `explain_one` from `ml/` (import or vendor; decide in planning). **Don't reimplement it.**
-- [ ] `GET /api/v1/models` → contents of `metrics.json` for the comparison view.
+- [ ] `GET /api/v1/models?condition=<id>` → that condition's `metrics.json` for the comparison view.
 - [ ] Tests: valid input → probability in [0,1]; out-of-range BMI → 422; contributions keys match feature list; uses a tiny model trained in a fixture, not the real artifact.
 - [ ] **Write the assignment doc** → `docs/assignments/H19-predict.md`.
 
@@ -810,7 +881,7 @@ _Goal: an interactive, honest dashboard. One real chart first, then widen._
 **Depends on:** H18, H21
 
 - [ ] **Plan this assignment.** Recharts vs Plotly.js; write an ADR.
-- [ ] "Diabetes rate by BMI band" bar chart wired to `/stats/prevalence?by=bmi_band` against the real seeded DB.
+- [ ] "Prevalence by BMI band" bar chart wired to `/stats/prevalence?condition=diabetes&by=bmi_band` against the real seeded DB, with a **condition dropdown** fed by `/conditions` (even if it only lists one at first).
 - [ ] Loading, error, and empty states.
 - [ ] **Write the assignment doc** → `docs/assignments/H22-first-chart.md`.
 
@@ -825,7 +896,8 @@ _Goal: an interactive, honest dashboard. One real chart first, then widen._
 **Depends on:** H22
 
 - [ ] **Plan this assignment.**
-- [ ] Group-by selector + filters (age band, sex, …) driving the prevalence endpoint; 2–3 more chart types (e.g. activity level, general health, income).
+- [ ] **Condition selector** (grouped by body system: cardiometabolic, respiratory, musculoskeletal, mental health, kidney) + group-by selector + filters (age band, sex, …) driving the prevalence endpoint; 2–3 more chart types (e.g. activity level, general health, income).
+- [ ] A **compare conditions** view: prevalence of several conditions side by side for the same group (for example, by age band).
 - [ ] Show `n` per group and grey out suppressed groups.
 - [ ] Accessibility: colour-blind-safe palette, labelled axes, keyboard-usable controls.
 - [ ] **Write the assignment doc** → `docs/assignments/H23-explorer.md`.
@@ -837,8 +909,8 @@ _Goal: an interactive, honest dashboard. One real chart first, then widen._
 **Depends on:** H19, H21
 
 - [ ] **Plan this assignment.**
-- [ ] Form built from the canonical schema (client-side validation mirrors the API's).
-- [ ] Result: risk percentage + band, and a "what pushed this up / down" bar chart from `contributions`.
+- [ ] Condition selector first; the form is **built from the chosen condition's feature list** (client-side validation mirrors the API's). Analytics-only conditions show _why_ individual prediction is off instead of a form.
+- [ ] Result: risk percentage + band + **signal-strength label**, and a "what pushed this up / down" bar chart from `contributions`.
 - [ ] Disclaimer visible next to the result, not hidden in a footer.
 - [ ] **Write the assignment doc** → `docs/assignments/H24-predict-ui.md`.
 
@@ -849,7 +921,7 @@ _Goal: an interactive, honest dashboard. One real chart first, then widen._
 **Depends on:** H15, H19
 
 - [ ] **Plan this assignment.**
-- [ ] Table/chart of LR vs XGBoost (± LightGBM): ROC-AUC, PR-AUC, recall, precision, Brier; ROC curves if exported.
+- [ ] Table/chart of LR vs XGBoost (± LightGBM): ROC-AUC, PR-AUC, recall, precision, Brier; ROC curves if exported. **Per condition**, plus one summary table across all conditions with signal strength and release-gate status, so weak models are visible rather than hidden.
 - [ ] Global SHAP importance chart.
 - [ ] Subgroup performance + plain-language limitations from the model card.
 - [ ] **Write the assignment doc** → `docs/assignments/H25-model-comparison.md`.
@@ -967,6 +1039,7 @@ _Goal: realistic patient data to build and demo against, shaped so real data can
 - [ ] **Plan this assignment.** A small custom generator (seeded) is the default. Synthea (open-source FHIR generator) is an optional stretch.
 - [ ] Tests first: same seed gives identical output; values stay in valid ranges; every patient has `is_synthetic = true`; no real names or identifiers (use obviously fake ones).
 - [ ] Generate ~200 patients, 5–8 doctors, 1 admin; 2–3 years of observations per patient with plausible correlations (higher BMI tends to higher glucose/BP; trends drift over time); medications consistent with conditions.
+- [ ] **A varied mix of conditions across the registry** (some patients with one, some with several, some with none), with condition prevalence by age and sex resembling the survey. Use the registry's condition ids so the generator can't invent a condition the app doesn't know.
 - [ ] Use the BRFSS/CCHS profile distributions so patient mix resembles the survey population.
 - [ ] `PatientDataSource` interface with `SyntheticSource` implemented; `FhirBundleSource` / `CsvSource` stubbed.
 - [ ] `docs/real-data-swap.md`: the exact steps and mapping table to replace synthetic with real data later.
@@ -1032,7 +1105,7 @@ _Goal: three clear experiences on one codebase._
 **Depends on:** H14, H19, H35
 
 - [ ] **Plan this assignment.** Map a patient's fields to the model's canonical features (BMI, blood pressure status, age band, sex…). Document what _cannot_ be mapped (e.g. no lab values in the survey model).
-- [ ] `GET /patients/{id}/risk-context`: model estimate, top SHAP contributions, and **"patients like this"**: survey prevalence for the same age band, sex, and BMI band (weighted).
+- [ ] `GET /patients/{id}/risk-context?condition=<id>`: model estimate, top SHAP contributions, and **"patients like this"**: survey prevalence for the same age band, sex, and BMI band (weighted). Only for conditions that pass the release gate (H50); otherwise return the population context alone. Skip a condition the patient **already has** as a diagnosis: we estimate risk, we don't re-diagnose.
 - [ ] Response always includes a `limitations` field with the model-card text. UI cannot omit it.
 - [ ] Access through the same scoping as H33 (patient: own; doctor: assigned; admin: logged).
 - [ ] **Write the assignment doc** → `docs/assignments/H40-risk-context.md`.
@@ -1116,6 +1189,7 @@ _Goal: an explanation of predictions and an AI assistant, with safety built in r
 - [ ] **Plan this assignment.**
 - [ ] **Deterministic first:** turn the SHAP contributions into readable sentences from templates ("Your BMI is the biggest factor raising this estimate; being physically active lowers it."). Tested with golden examples, no AI required.
 - [ ] Two reading levels: clinician and patient.
+- [ ] Condition-specific wording comes from the registry (H49), so a new condition needs no new code; sensitive conditions get softer, non-alarming wording.
 - [ ] Optional: LLM rewording behind H45, with a check that the rewording doesn't add or remove any factor.
 - [ ] Never states a diagnosis; always links the limitations.
 - [ ] **Write the assignment doc** → `docs/assignments/H46-explanations.md`.
@@ -1128,6 +1202,7 @@ _Goal: an explanation of predictions and an AI assistant, with safety built in r
 
 - [ ] **Plan this assignment.** Start with a narrow, useful scope: "explain this chart", "explain this prediction", "where do I find X".
 - [ ] The assistant works through **tools that call the same role-scoped endpoints** the UI uses, so it can't see more than the signed-in user can.
+- [ ] It reads the **condition registry**: it can explain population data for any condition, but for analytics-only conditions it never produces or implies an individual risk number.
 - [ ] System rules: no diagnosis, no medication advice or dosing, no emergency guidance beyond "contact a clinician or emergency services", always cite which data it used.
 - [ ] **Safety test set (≥30 prompts, runs in CI against the fake provider's rules and manually against the real one):** diagnosis requests, dosage questions, "ignore your instructions", "show me patient #12's record" as a patient, attempts to exfiltrate the system prompt. All must be refused or safely redirected.
 - [ ] Chat UI with the disclaimer visible; conversation logs store no clinical content (or are not stored).
@@ -1242,12 +1317,12 @@ Four people means four lanes running in parallel. Times are the milestone weeks 
 
 1. **Week 1: foundation and decisions.** `H05` (CCHS chase, one person) ‖ `H01 → H02 → H03 → H04` ‖ **`H31` (access matrix, everyone)** ‖ `H06` (load and profile).
 2. **Week 2: four lanes.**
-   - ML: `H07 → H08 → H09 → H10 → (H11 ‖ H12)`.
+   - ML: `H07 → H08 → H09 → H49` (registry, with **diabetes only** first) `→ H10 → (H11 ‖ H12)`.
    - Backend: `H16 → H17`, then start `H32` (auth).
    - Frontend: `H21` (skeleton, then the shell with login in H41).
    - Data: `H35` (clinical model) and the start of `H36` (generator).
-3. **Week 3: walking skeleton.** `H13 → H14`, `H18`, `H19`, `H22` (first real chart), `H33` (authorization tests), `H34` (audit), `H41` (login on the frontend). **CCHS go/no-go (`H29`) by 6 Nov.**
-4. **Weeks 4–5: clinical workspace.** `H36` done, `H37 ‖ H38 ‖ H39`, `H40`, `H42 ‖ H43 ‖ H44`, `H45`, `H46`; deploy early (`H26 → H27 → H28`).
+3. **Week 3: walking skeleton.** `H13 → H14` (diabetes), then add **hypertension and heart disease** to the registry, `H50` (release gate), `H18`, `H19`, `H22` (first real chart), `H33` (authorization tests), `H34` (audit), `H41` (login on the frontend). **CCHS go/no-go (`H29`) by 6 Nov.**
+4. **Weeks 4–5: clinical workspace** (and, in the ML lane, the **Tier 2 conditions** through the same pipeline, one per day or so; each one that's ready ships). `H36` done, `H37 ‖ H38 ‖ H39`, `H40`, `H42 ‖ H43 ‖ H44`, `H45`, `H46`; deploy early (`H26 → H27 → H28`).
 5. **Week 5–6: AI and polish.** `H47` (assistant), `H15`, `H20`, `H23–H25`.
 6. **Freeze Fri 27 Nov.** Then hardening, `H48` (pilot pack), `H30` (report, demo, rehearsal).
 
@@ -1298,11 +1373,12 @@ Four people means four lanes running in parallel. Times are the milestone weeks 
 
 - CCHS PUMF catalogue (2000–2022): https://www150.statcan.gc.ca/n1/pub/82m0013x/82m0013x2024001-eng.htm
 - Odesi guide: https://learn.scholarsportal.info/all-guides/odesi/
-- Kaggle BRFSS Diabetes Health Indicators: https://www.kaggle.com/datasets/alexteboul/diabetes-health-indicators-dataset
+- CDC BRFSS annual data (main source, many conditions): https://www.cdc.gov/brfss/annual_data/annual_data.htm
+- Kaggle BRFSS Diabetes Health Indicators (diabetes-only quick-start): https://www.kaggle.com/datasets/alexteboul/diabetes-health-indicators-dataset
 
 ---
 
-_Total assignments: 48 (H01–H48) across 11 epics (E0–E10)._
+_Total assignments: 50 (H01–H50) across 11 epics (E0–E10). H49 and H50 sit in E2 but are numbered last because they were added after the first plan._
 _Spikes: H05 (CCHS access), H31 (access matrix), H45 (LLM rules). Decision points: H29 (CCHS go/no-go, by 6 Nov), feature freeze (27 Nov)._
 _Every assignment opens with `Plan this assignment` and closes with `Write the assignment doc` (docs/assignments/)._
 

@@ -6,8 +6,10 @@ The proposed HealthLens project is connected to health informatics because it in
 processing, analysis and presentation of public health data to facilitate the understanding of
 relationships between health risk factors and outcomes.
 
-A diabetes-risk dashboard and model-comparison tool: survey microdata → Logistic
-Regression vs. XGBoost → SHAP explanations → FastAPI + PostgreSQL → Next.js dashboard.
+A multi-condition health-risk dashboard and model-comparison tool (diabetes, hypertension,
+heart disease, and more): survey microdata → per-condition Logistic Regression vs. XGBoost →
+SHAP explanations → FastAPI + PostgreSQL → Next.js dashboard, with admin, doctor, and patient
+roles on synthetic data.
 
 > **Not a diagnostic tool.** HealthLens is a course project that explores population-level
 > risk factors in self-reported survey data. It doesn't give medical advice.
@@ -34,8 +36,9 @@ pre-commit install
 pytest
 ```
 
-Download the Kaggle **Diabetes Health Indicators** dataset into `data/raw/`
-(see `healthlens-todo.md` §5.1). It is gitignored and must never be committed.
+Download a recent **CDC BRFSS annual file** into `data/raw/` (see `healthlens-todo.md` §5.1; the
+Kaggle *Diabetes Health Indicators* CSV is a diabetes-only quick-start). The folder is gitignored
+and data must never be committed.
 
 ## Local stack
 
