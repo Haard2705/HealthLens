@@ -1,0 +1,97 @@
+# HealthLens condition registry: the single source of truth for what we model.
+#
+# FROZEN at nine conditions (agreed by the team). ml/tests/test_registry.py pins this
+# set, so changing it means editing that test on purpose. Do not add conditions
+# casually: each one needs a source mapping, a model, a model card, and review.
+#
+# Fields
+#   id                    stable identifier used in the API, URLs, and file names
+#   display_name          what users see
+#   body_system           cardiometabolic | respiratory | musculoskeletal | mental_health | renal
+#   tier                  1 = full treatment (tuned, subgroup analysis, reviewed card)
+#                         2 = standard pipeline (default settings, generated card)
+#   source                which dataset adapter supplies the outcome (brfss only, for now)
+#   outcome_column        canonical column name in our schema (NOT the raw survey name)
+#   description           plain-language meaning; the exact definition follows the survey
+#                         codebook and is documented in docs/data-dictionary.md
+#   sensitive             true = analytics only, never an individual prediction (see H50)
+#   comorbidity_features  optional: other conditions' outcome columns this model may use
+#                         as predictors. Empty by default: other outcomes are NOT predictors.
+#
+# Raw survey variable names never appear here. They live in the source adapter (H07).
+
+conditions:
+  # ---- Tier 1: full treatment -------------------------------------------------
+  - id: diabetes
+    display_name: Diabetes
+    body_system: cardiometabolic
+    tier: 1
+    source: brfss
+    outcome_column: diabetes
+    description: Respondent reports having been told by a health professional that they have diabetes.
+
+  - id: hypertension
+    display_name: Hypertension
+    body_system: cardiometabolic
+    tier: 1
+    source: brfss
+    outcome_column: high_bp
+    description: Respondent reports having been told by a health professional that they have high blood pressure.
+
+  - id: heart_disease
+    display_name: Heart disease
+    body_system: cardiometabolic
+    tier: 1
+    source: brfss
+    outcome_column: heart_disease
+    description: Respondent reports a history of heart attack or coronary heart disease.
+
+  # ---- Tier 2: standard pipeline ----------------------------------------------
+  - id: stroke
+    display_name: Stroke
+    body_system: cardiometabolic
+    tier: 2
+    source: brfss
+    outcome_column: stroke
+    description: Respondent reports having been told by a health professional that they had a stroke.
+
+  - id: asthma
+    display_name: Asthma
+    body_system: respiratory
+    tier: 2
+    source: brfss
+    outcome_column: asthma
+    description: Respondent reports having asthma, as defined in the survey codebook.
+
+  - id: copd
+    display_name: COPD
+    body_system: respiratory
+    tier: 2
+    source: brfss
+    outcome_column: copd
+    description: Respondent reports chronic obstructive pulmonary disease, emphysema, or chronic bronchitis.
+
+  - id: arthritis
+    display_name: Arthritis
+    body_system: musculoskeletal
+    tier: 2
+    source: brfss
+    outcome_column: arthritis
+    description: Respondent reports having been told they have some form of arthritis.
+
+  - id: kidney_disease
+    display_name: Chronic kidney disease
+    body_system: renal
+    tier: 2
+    source: brfss
+    outcome_column: kidney_disease
+    description: Respondent reports having been told they have kidney disease, not including kidney stones.
+
+  - id: depression
+    display_name: Depression
+    body_system: mental_health
+    tier: 2
+    source: brfss
+    outcome_column: depression
+    sensitive: true
+    description: Respondent reports having been told by a health professional that they have a depressive disorder.

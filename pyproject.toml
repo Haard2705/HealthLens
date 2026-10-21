@@ -11,6 +11,7 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "NPY", "PD"]
 
 [tool.pytest.ini_options]
 testpaths = ["ml/tests", "backend/tests"]
+pythonpath = ["."]
 addopts = "-ra --strict-markers"
 markers = [
   "integration: needs real backing services (Postgres)",
