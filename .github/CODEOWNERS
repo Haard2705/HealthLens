@@ -1,11 +1,16 @@
 # CODEOWNERS — who is automatically requested for review on changed paths.
 # Docs: https://docs.github.com/articles/about-code-owners
-# TODO(H02): replace @teammate-* with real GitHub handles.
+#
+# Team: Haard (@Haard2705), Krish (@patelkrish3805-eng), Rudra (@rudraukani), Vish (@Vish-210).
+#
+# For now everyone is requested on every change. Once the team has agreed who owns
+# which area (healthlens-todo.md §6), narrow the paths below, for example:
+#   /ml/        @Haard2705 @<ml-owner>
+#   /backend/   @Haard2705 @<backend-owner>
+# Last matching pattern wins, so keep specific paths BELOW the default.
 
-*               @Haard2705
-/ml/            @Haard2705 @teammate-ml
-/data/          @Haard2705 @teammate-data
-/backend/       @Haard2705 @teammate-backend
-/frontend/      @Haard2705 @teammate-frontend
-/.github/       @Haard2705
-/healthlens-todo.md   @Haard2705 @teammate-ml @teammate-data @teammate-backend @teammate-frontend
+*   @Haard2705 @patelkrish3805-eng @rudraukani @Vish-210
+
+# CI, repo settings, and the plan are reviewed by everyone.
+/.github/            @Haard2705 @patelkrish3805-eng @rudraukani @Vish-210
+/healthlens-todo.md  @Haard2705 @patelkrish3805-eng @rudraukani @Vish-210
