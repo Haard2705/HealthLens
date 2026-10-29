@@ -40,6 +40,16 @@ Download a recent **CDC BRFSS annual file** into `data/raw/` (see `healthlens-to
 Kaggle *Diabetes Health Indicators* CSV is a diabetes-only quick-start). The folder is gitignored
 and data must never be committed.
 
+**Dataset in use: BRFSS 2025.** Download `LLCP2025XPT.zip` (SAS transport, ~64 MB zipped) from
+<https://www.cdc.gov/brfss/annual_data/annual_2025.html>, unzip it into `data/raw/`, then profile it:
+
+```bash
+python ml/src/load_data.py --target DIABETE4
+```
+
+The variables we use, and how they're coded, are in
+[`docs/brfss-2025-variables.md`](docs/brfss-2025-variables.md).
+
 ## Local stack
 
 ```bash

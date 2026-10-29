@@ -586,12 +586,12 @@ _Goal: raw survey file → validated, canonical, model-ready DataFrame, with the
 
 - [ ] **Plan this assignment.**
 - [ ] Download a **recent CDC BRFSS annual file** into `data/raw/` (large; document the year and exact file name in the README). Use the Kaggle diabetes CSV only as a quick-start while it downloads.
-- [ ] From that year's codebook, list the variable name and coding for **every condition in §5.4 and every predictor in §5.3**. This list feeds H07 and H49.
-- [ ] Write tests first (`ml/tests/test_load_data.py`) using a tiny synthetic CSV fixture: loads, reports correct row count, detects class balance.
-- [ ] `ml/src/load_data.py`: `load_raw(path) -> DataFrame` and a `profile(df, target) -> dict` used by the CLI printout.
-- [ ] Profile includes: shape, dtypes, NaN counts, **sentinel-code candidates** (values like 7/9/77/99 in categorical cols), duplicate rows, class balance.
-- [ ] Paths come from one config module (`ml/src/config.py`), not hard-coded strings.
-- [ ] **Write the assignment doc** → `docs/assignments/H06-load-profile.md` (paste the profile output).
+- [x] From that year's codebook, list the variable name and coding for **every condition in §5.4 and every predictor in §5.3**. This list feeds H07 and H49. _(BRFSS 2025 → `docs/brfss-2025-variables.md`; ⚠️ rows still to confirm in H07.)_
+- [x] Write tests first (`ml/tests/test_load_data.py`) using a tiny synthetic CSV fixture: loads, reports correct row count, detects class balance.
+- [x] `ml/src/load_data.py`: `load_raw(path) -> DataFrame` and a `profile(df, target) -> dict` used by the CLI printout.
+- [x] Profile includes: shape, dtypes, NaN counts, **sentinel-code candidates** (values like 7/9/77/99 in categorical cols), duplicate rows, class balance.
+- [x] Paths come from one config module (`ml/src/config.py`), not hard-coded strings.
+- [x] **Write the assignment doc** → `docs/assignments/H06-load-profile.md` (paste the profile output).
 
 **Acceptance Criteria:**
 

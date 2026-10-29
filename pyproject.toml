@@ -3,6 +3,8 @@
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Lets isort treat pipeline modules (config, load_data, ...) as first-party.
+src = ["ml/src", "backend"]
 extend-exclude = ["ml/notebooks", "frontend"]
 
 [tool.ruff.lint]
@@ -11,6 +13,9 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "NPY", "PD"]
 
 [tool.pytest.ini_options]
 testpaths = ["ml/tests", "backend/tests"]
+# Pipeline modules import each other by name (e.g. `import config`), the same way
+# they do when run as scripts with `python ml/src/<module>.py`.
+pythonpath = ["ml/src"]
 addopts = "-ra --strict-markers"
 markers = [
   "integration: needs real backing services (Postgres)",
