@@ -27,7 +27,7 @@ means don't know, refused or not asked, **never "no"**. CCHS column is filled in
 | Canonical name | BRFSS 2025 source | Mapping |
 |---|---|---|
 | `diabetes` | `DIABETE4` | 1 yes; **2 (pregnancy only), 3, 4 (pre-diabetes) no**; 7, 9, blank missing |
-| `hypertension` | `BPHIGH6` | 1 yes; **2 (pregnancy only), 3, 4 (borderline) no**; 7, 9, blank missing |
+| `high_bp` (hypertension) | `BPHIGH6` | 1 yes; **2 (pregnancy only), 3, 4 (borderline) no**; 7, 9, blank missing |
 | `heart_disease` | `CVDINFR4`, `CVDCRHD4` | yes if either is 1; no if both are 2; otherwise missing (same as CDC `_MICHD`) |
 | `stroke` | `CVDSTRK3` | 1 yes, 2 no |
 | `asthma` | `ASTHMA3` | 1 yes, 2 no |

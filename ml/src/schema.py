@@ -9,7 +9,7 @@ import pandas as pd
 
 OUTCOMES = (
     "diabetes",
-    "hypertension",
+    "high_bp",
     "heart_disease",
     "stroke",
     "asthma",

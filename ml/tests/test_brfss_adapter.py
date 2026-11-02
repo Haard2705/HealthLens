@@ -61,9 +61,9 @@ def test_diabetes_counts_pregnancy_only_and_prediabetes_as_no():
     assert values(out["diabetes"]) == [True, False, False, False, None, None, None]
 
 
-def test_hypertension_counts_pregnancy_only_and_borderline_as_no():
+def test_high_bp_counts_pregnancy_only_and_borderline_as_no():
     out = adapt(BPHIGH6=[1, 2, 3, 4, 7, 9, None])
-    assert values(out["hypertension"]) == [True, False, False, False, None, None, None]
+    assert values(out["high_bp"]) == [True, False, False, False, None, None, None]
 
 
 def test_heavy_alcohol_code_2_means_yes():

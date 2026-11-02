@@ -17,7 +17,7 @@ YES_OTHERS_NO = {1: True, 2: False, 3: False, 4: False}
 # canonical column -> (raw column, code map). Codes not listed (7, 9, blank) become missing.
 BOOLEAN_COLUMNS = {
     "diabetes": ("DIABETE4", YES_OTHERS_NO),
-    "hypertension": ("BPHIGH6", YES_OTHERS_NO),
+    "high_bp": ("BPHIGH6", YES_OTHERS_NO),
     "stroke": ("CVDSTRK3", YES_NO),
     "asthma": ("ASTHMA3", YES_NO),
     "copd": ("CHCCOPD3", YES_NO),

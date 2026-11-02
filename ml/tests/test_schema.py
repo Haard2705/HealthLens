@@ -19,9 +19,9 @@ def good() -> pd.DataFrame:
             "education_band": [4, 1],
             "phys_active": [True, False],
             "diabetes": [True, False],
-            "hypertension": [False, pd.NA],
+            "high_bp": [False, pd.NA],
         }
-    ).astype({"phys_active": "boolean", "diabetes": "boolean", "hypertension": "boolean"})
+    ).astype({"phys_active": "boolean", "diabetes": "boolean", "high_bp": "boolean"})
 
 
 def test_valid_frame_passes(good):
@@ -42,7 +42,7 @@ def test_missing_required_column_is_rejected(good, column):
 
 def test_frame_without_any_outcome_is_rejected(good):
     with pytest.raises(schema.SchemaError, match="outcome"):
-        schema.validate_schema(good.drop(columns=["diabetes", "hypertension"]))
+        schema.validate_schema(good.drop(columns=["diabetes", "high_bp"]))
 
 
 @pytest.mark.parametrize("bmi", [5.0, 150.0])
