@@ -605,13 +605,13 @@ _Goal: raw survey file → validated, canonical, model-ready DataFrame, with the
 **Why it matters:** This is the assignment that makes the BRFSS → CCHS swap a mapping exercise rather than a rewrite.
 **Depends on:** H06
 
-- [ ] **Plan this assignment.** Finalise the canonical feature list (§5.3) as a team.
-- [ ] `ml/src/schema.py`: canonical column names, dtypes, allowed ranges/categories, required vs optional; `validate_schema(df)` raising clear errors.
-- [ ] `ml/src/sources/brfss.py`: `to_canonical(raw_df) -> DataFrame` (renames, recodes bands, maps the **final weight** to `survey_weight`, and produces **one boolean outcome column per condition** in §5.4: yes → True, no → False, don't know / refused / not asked → missing).
+- [x] **Plan this assignment.** Finalise the canonical feature list (§5.3) as a team.
+- [x] `ml/src/schema.py`: canonical column names, dtypes, allowed ranges/categories, required vs optional; `validate_schema(df)` raising clear errors.
+- [x] `ml/src/sources/brfss.py`: `to_canonical(raw_df) -> DataFrame` (renames, recodes bands, maps the **final weight** to `survey_weight`, and produces **one boolean outcome column per condition** in §5.4: yes → True, no → False, don't know / refused / not asked → missing).
 - [ ] `ml/src/sources/cchs.py`: stub with the mapping table filled in from H05 (implemented in H29 if CCHS is a go).
-- [ ] Tests first: each adapter maps a hand-written 5-row raw fixture to the expected canonical frame; `validate_schema` rejects out-of-range BMI, unknown categories, missing target.
-- [ ] `docs/data-dictionary.md`: canonical name → meaning → BRFSS source → CCHS source.
-- [ ] **Write the assignment doc** → `docs/assignments/H07-canonical-schema.md`.
+- [x] Tests first: each adapter maps a hand-written 5-row raw fixture to the expected canonical frame; `validate_schema` rejects out-of-range BMI, unknown categories, missing target.
+- [x] `docs/data-dictionary.md`: canonical name → meaning → BRFSS source → CCHS source.
+- [x] **Write the assignment doc** → `docs/assignments/H07-canonical-schema.md`.
 
 **Acceptance Criteria:**
 

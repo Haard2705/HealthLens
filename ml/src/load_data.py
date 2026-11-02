@@ -1,6 +1,6 @@
 """Load a raw survey file and print a profile of it.
 
-Run from the repo root:  python -m ml.src.load_data --target DIABETE4
+Run from the repo root:  python -m ml.src.load_data --target <raw outcome column>
 """
 
 import argparse
