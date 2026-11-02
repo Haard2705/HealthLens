@@ -36,9 +36,15 @@ pre-commit install
 pytest
 ```
 
-Download a recent **CDC BRFSS annual file** into `data/raw/` (see `healthlens-todo.md` §5.1; the
-Kaggle *Diabetes Health Indicators* CSV is a diabetes-only quick-start). The folder is gitignored
-and data must never be committed.
+Download the **CDC BRFSS 2025 annual file** (~760 MB) into `data/raw/` (see
+`healthlens-todo.md` §5.1):
+
+```bash
+python scripts/download_brfss.py
+```
+
+Pass `--year` for another survey year. The Kaggle *Diabetes Health Indicators* CSV is a
+diabetes-only quick-start. The folder is gitignored and data must never be committed.
 
 ## Local stack
 
