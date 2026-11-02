@@ -605,13 +605,13 @@ _Goal: raw survey file → validated, canonical, model-ready DataFrame, with the
 **Why it matters:** This is the assignment that makes the BRFSS → CCHS swap a mapping exercise rather than a rewrite.
 **Depends on:** H06
 
-- [ ] **Plan this assignment.** Finalise the canonical feature list (§5.3) as a team.
-- [ ] `ml/src/schema.py`: canonical column names, dtypes, allowed ranges/categories, required vs optional; `validate_schema(df)` raising clear errors.
-- [ ] `ml/src/sources/brfss.py`: `to_canonical(raw_df) -> DataFrame` (renames, recodes bands, maps the **final weight** to `survey_weight`, and produces **one boolean outcome column per condition** in §5.4: yes → True, no → False, don't know / refused / not asked → missing).
+- [x] **Plan this assignment.** Finalise the canonical feature list (§5.3) as a team.
+- [x] `ml/src/schema.py`: canonical column names, dtypes, allowed ranges/categories, required vs optional; `validate_schema(df)` raising clear errors.
+- [x] `ml/src/sources/brfss.py`: `to_canonical(raw_df) -> DataFrame` (renames, recodes bands, maps the **final weight** to `survey_weight`, and produces **one boolean outcome column per condition** in §5.4: yes → True, no → False, don't know / refused / not asked → missing).
 - [ ] `ml/src/sources/cchs.py`: stub with the mapping table filled in from H05 (implemented in H29 if CCHS is a go).
-- [ ] Tests first: each adapter maps a hand-written 5-row raw fixture to the expected canonical frame; `validate_schema` rejects out-of-range BMI, unknown categories, missing target.
-- [ ] `docs/data-dictionary.md`: canonical name → meaning → BRFSS source → CCHS source.
-- [ ] **Write the assignment doc** → `docs/assignments/H07-canonical-schema.md`.
+- [x] Tests first: each adapter maps a hand-written 5-row raw fixture to the expected canonical frame; `validate_schema` rejects out-of-range BMI, unknown categories, missing target.
+- [x] `docs/data-dictionary.md`: canonical name → meaning → BRFSS source → CCHS source.
+- [x] **Write the assignment doc** → `docs/assignments/H07-canonical-schema.md`.
 
 **Acceptance Criteria:**
 
@@ -624,12 +624,12 @@ _Goal: raw survey file → validated, canonical, model-ready DataFrame, with the
 **Goal:** Sentinel codes → NaN, categoricals encoded consistently, duplicates handled, output saved to `data/processed/`.
 **Depends on:** H07
 
-- [ ] **Plan this assignment.** Decide: dedupe or not; valid-skip handling; imputation strategy (inside the model pipeline, not here).
-- [ ] Tests first: sentinel codes (6/7/8/9, 96–99, 996–999) become NaN **per a per-variable code table**, not a global "replace 9 everywhere" (9 can be a real value); valid skips map to "not applicable"; output passes `validate_schema`.
-- [ ] **Missing outcome ≠ "no".** A respondent who skipped or refused the asthma question is dropped from the asthma model's training set, never counted as "no asthma". Test this per condition.
-- [ ] `ml/src/clean.py`: `clean(df) -> DataFrame`, pure function, no I/O; a `main()` that reads raw → adapter → clean → writes `data/processed/<source>_clean.parquet`.
-- [ ] Log what was changed (rows dropped, values recoded, per column).
-- [ ] **Write the assignment doc** → `docs/assignments/H08-clean.md`.
+- [x] **Plan this assignment.** Decide: dedupe or not; valid-skip handling; imputation strategy (inside the model pipeline, not here).
+- [x] Tests first: sentinel codes (6/7/8/9, 96–99, 996–999) become NaN **per a per-variable code table**, not a global "replace 9 everywhere" (9 can be a real value); valid skips map to "not applicable"; output passes `validate_schema`.
+- [x] **Missing outcome ≠ "no".** A respondent who skipped or refused the asthma question is dropped from the asthma model's training set, never counted as "no asthma". Test this per condition.
+- [x] `ml/src/clean.py`: `clean(df) -> DataFrame`, pure function, no I/O; a `main()` that reads raw → adapter → clean → writes `data/processed/<source>_clean.parquet`.
+- [x] Log what was changed (rows dropped, values recoded, per column).
+- [x] **Write the assignment doc** → `docs/assignments/H08-clean.md`.
 
 **Acceptance Criteria:**
 
