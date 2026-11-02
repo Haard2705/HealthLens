@@ -624,12 +624,12 @@ _Goal: raw survey file → validated, canonical, model-ready DataFrame, with the
 **Goal:** Sentinel codes → NaN, categoricals encoded consistently, duplicates handled, output saved to `data/processed/`.
 **Depends on:** H07
 
-- [ ] **Plan this assignment.** Decide: dedupe or not; valid-skip handling; imputation strategy (inside the model pipeline, not here).
-- [ ] Tests first: sentinel codes (6/7/8/9, 96–99, 996–999) become NaN **per a per-variable code table**, not a global "replace 9 everywhere" (9 can be a real value); valid skips map to "not applicable"; output passes `validate_schema`.
-- [ ] **Missing outcome ≠ "no".** A respondent who skipped or refused the asthma question is dropped from the asthma model's training set, never counted as "no asthma". Test this per condition.
-- [ ] `ml/src/clean.py`: `clean(df) -> DataFrame`, pure function, no I/O; a `main()` that reads raw → adapter → clean → writes `data/processed/<source>_clean.parquet`.
-- [ ] Log what was changed (rows dropped, values recoded, per column).
-- [ ] **Write the assignment doc** → `docs/assignments/H08-clean.md`.
+- [x] **Plan this assignment.** Decide: dedupe or not; valid-skip handling; imputation strategy (inside the model pipeline, not here).
+- [x] Tests first: sentinel codes (6/7/8/9, 96–99, 996–999) become NaN **per a per-variable code table**, not a global "replace 9 everywhere" (9 can be a real value); valid skips map to "not applicable"; output passes `validate_schema`.
+- [x] **Missing outcome ≠ "no".** A respondent who skipped or refused the asthma question is dropped from the asthma model's training set, never counted as "no asthma". Test this per condition.
+- [x] `ml/src/clean.py`: `clean(df) -> DataFrame`, pure function, no I/O; a `main()` that reads raw → adapter → clean → writes `data/processed/<source>_clean.parquet`.
+- [x] Log what was changed (rows dropped, values recoded, per column).
+- [x] **Write the assignment doc** → `docs/assignments/H08-clean.md`.
 
 **Acceptance Criteria:**
 
