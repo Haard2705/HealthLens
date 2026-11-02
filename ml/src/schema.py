@@ -7,17 +7,10 @@ Missing answers are always missing (NaN / <NA>), never "no".
 
 import pandas as pd
 
-OUTCOMES = (
-    "diabetes",
-    "high_bp",
-    "heart_disease",
-    "stroke",
-    "asthma",
-    "copd",
-    "arthritis",
-    "kidney_disease",
-    "depression",
-)
+from .registry import load_registry
+
+# One boolean column per modelled condition; the list lives in conditions.yaml (H49).
+OUTCOMES = load_registry().outcome_columns
 BOOL_PREDICTORS = ("phys_active", "heavy_alcohol", "fruit_daily", "veg_daily", "high_chol")
 CATEGORIES = {
     "sex": {"male", "female"},

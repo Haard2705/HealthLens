@@ -3,6 +3,8 @@
 import pandas as pd
 import pytest
 from src import schema
+from src.registry import load_registry
+from src.registry import validate_against_schema as reg_validate_against_schema
 
 
 @pytest.fixture
@@ -22,6 +24,13 @@ def good() -> pd.DataFrame:
             "high_bp": [False, pd.NA],
         }
     ).astype({"phys_active": "boolean", "diabetes": "boolean", "high_bp": "boolean"})
+
+
+def test_schema_outcomes_come_from_the_condition_registry():
+    registry = load_registry()
+
+    assert registry.outcome_columns == schema.OUTCOMES
+    reg_validate_against_schema(registry, schema.ALL_COLUMNS)
 
 
 def test_valid_frame_passes(good):

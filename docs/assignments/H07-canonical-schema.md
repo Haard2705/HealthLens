@@ -39,7 +39,8 @@ disease yes 31,687 (CDC `_MICHD`), BMI missing 32,562, income missing 71,050.
 ## Gotchas / follow-ups
 
 - `sources/cchs.py` stub is **not written yet**; it needs the codebook from H05.
-- `OUTCOMES` in `schema.py` names the diseases; when the condition registry (H49) lands,
-  decide whether the list moves there.
+- `schema.OUTCOMES` is read from the condition registry (`ml/src/conditions.yaml`, H49), so
+  `schema.py` names no disease; a test checks the two never disagree. The registry pins the
+  blood-pressure outcome column as `high_bp`, so the schema uses that name too.
 - Raw numbers are floats (`1.0`); adapters rely on that and map by value.
 - H08 still has to handle remaining cleaning (for example BMI outliers and dedupe policy).
