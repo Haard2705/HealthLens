@@ -642,11 +642,11 @@ _Goal: raw survey file → validated, canonical, model-ready DataFrame, with the
 **Goal:** The lifestyle/health-factor features from the P1/P2 plan, built on canonical columns only.
 **Depends on:** H08
 
-- [ ] **Plan this assignment.** Pull the feature list from P1/P2.
-- [ ] Tests first for each feature (e.g. `bmi_band` boundaries 18.5/25/30, `risk_factor_count`, `lifestyle_score`).
-- [ ] `ml/src/features.py`: stateless row-wise features here. **Stateful transforms (scaling, imputation, one-hot) go in the sklearn `Pipeline`**, so they're fit on train only.
-- [ ] Build `build_preprocessor()` returning a `ColumnTransformer` shared by all models.
-- [ ] **Write the assignment doc** → `docs/assignments/H09-features.md`.
+- [x] **Plan this assignment.** Pull the feature list from P1/P2.
+- [x] Tests first for each feature (e.g. `bmi_band` boundaries 18.5/25/30, `risk_factor_count`, `lifestyle_score`).
+- [x] `ml/src/features.py`: stateless row-wise features here. **Stateful transforms (scaling, imputation, one-hot) go in the sklearn `Pipeline`**, so they're fit on train only.
+- [x] Build `build_preprocessor()` returning a `ColumnTransformer` shared by all models.
+- [x] **Write the assignment doc** → `docs/assignments/H09-features.md`.
 
 **Acceptance Criteria:**
 
