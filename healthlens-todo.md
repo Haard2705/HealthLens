@@ -738,12 +738,12 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Goal:** Know where the model is weaker and say so plainly.
 **Depends on:** H13, H14
 
-- [ ] **Plan this assignment.**
-- [ ] Metrics by `sex`, `age_band`, `income_band` (recall, PR-AUC, calibration per group), **for the three Tier 1 conditions**. Tier 2 conditions get overall metrics and a generated card (H49).
-- [ ] Calibration plot for LR vs XGBoost.
-- [ ] `docs/model-cards/<condition>.md` for each Tier 1 condition: intended use, not-intended use, data, metrics, subgroup results, limitations (self-reported, cross-sectional, US BRFSS ≠ Canadian population unless CCHS lands). Tier 2 cards are generated from `metrics.json` plus the registry's text.
-- [ ] Plain-language limitations text that the frontend will show (H25).
-- [ ] **Write the assignment doc** → `docs/assignments/H15-model-card.md`.
+- [x] **Plan this assignment.** _(Cards generated from model files, wording in the generator; weak subgroups become limitation sentences automatically. See H15 doc.)_
+- [x] Metrics by `sex`, `age_band`, `income_band` (recall, PR-AUC, calibration per group), **for the three Tier 1 conditions**. Tier 2 conditions get overall metrics and a generated card (H49).
+- [x] Calibration plot for LR vs XGBoost.
+- [x] `docs/model-cards/<condition>.md` for each Tier 1 condition: intended use, not-intended use, data, metrics, subgroup results, limitations (self-reported, cross-sectional, US BRFSS ≠ Canadian population unless CCHS lands). Tier 2 cards are generated from `metrics.json` plus the registry's text.
+- [x] Plain-language limitations text that the frontend will show (H25).
+- [x] **Write the assignment doc** → `docs/assignments/H15-model-card.md`.
 
 ---
 
@@ -758,7 +758,7 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 - [ ] `ml/src/registry.py`: loads and **validates** the file (every `outcome_column` exists in the canonical schema; no condition lists its own outcome as a feature; ids are unique). Fails loudly with a clear message.
 - [ ] Tests first: a registry that excludes nothing for hypertension is rejected; an unknown outcome column is rejected; a valid 2-condition registry loads; no module outside `registry.py` hard-codes a disease name (enforce with a grep test, like H07).
 - [x] Generalise `train.py`, `explain.py`, `evaluate.py` to take `--condition` (H13/H14 reference this). _(Done: evaluate.py H10, train.py H13, explain.py H14.)_
-- [ ] **Auto-generated model card** for each condition from `metrics.json` and the registry text (the Tier 2 path; Tier 1 cards are then hand-edited in H15).
+- [x] **Auto-generated model card** for each condition from `metrics.json` and the registry text (the Tier 2 path; Tier 1 cards are then hand-edited in H15).
 - [ ] Start with **diabetes only** in the registry and get it green end-to-end, then add hypertension and heart disease, then the Tier 2 six. If a condition's data can't be mapped cleanly by the freeze, leave it out.
 - [ ] **Write the assignment doc** → `docs/assignments/H49-condition-registry.md`.
 
