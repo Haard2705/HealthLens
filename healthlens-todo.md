@@ -680,11 +680,11 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Goal:** A fast, interpretable floor to beat.
 **Depends on:** H10
 
-- [ ] **Plan this assignment.**
-- [ ] `Pipeline(preprocessor, LogisticRegression(class_weight="balanced", max_iter=…))`.
-- [ ] Small CV grid on `C` using the training set only.
-- [ ] Save coefficients (odds ratios) for the report.
-- [ ] **Write the assignment doc** → `docs/assignments/H11-logreg.md`.
+- [x] **Plan this assignment.** _(Pivot: no class re-weighting; "balanced" inflated probabilities past the no-skill Brier. Imbalance handled by H10's recall-oriented threshold. See H11 doc.)_
+- [x] `Pipeline(preprocessor, LogisticRegression(class_weight="balanced", max_iter=…))`.
+- [x] Small CV grid on `C` using the training set only.
+- [x] Save coefficients (odds ratios) for the report.
+- [x] **Write the assignment doc** → `docs/assignments/H11-logreg.md`.
 
 ---
 
