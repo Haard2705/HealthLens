@@ -666,12 +666,12 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Why it matters:** If every model is evaluated differently, the comparison is meaningless.
 **Depends on:** H09
 
-- [ ] **Plan this assignment.**
-- [ ] Stratified train/test split (e.g. 80/20) with a fixed seed, **after** dedup. **One split per condition**: rows with a missing outcome for that condition are dropped first, and the same respondents should land in test across conditions where possible.
-- [ ] `ml/src/evaluate.py`: `evaluate(model, X_test, y_test) -> dict` returning accuracy, precision, recall, F1, **ROC-AUC, PR-AUC, Brier score**, confusion matrix, and the threshold used.
-- [ ] Threshold policy: report at 0.5 **and** at a recall-oriented threshold chosen on validation data (screening tools favour recall). Document the choice.
-- [ ] Tests: metrics on a hand-computed tiny example; keys present; values in valid ranges.
-- [ ] **Write the assignment doc** → `docs/assignments/H10-evaluation.md`.
+- [x] **Plan this assignment.** _(Shared per-respondent draw so test sets overlap across conditions; recall target 0.8 chosen on validation; see H10 doc.)_
+- [x] Stratified train/test split (e.g. 80/20) with a fixed seed, **after** dedup. **One split per condition**: rows with a missing outcome for that condition are dropped first, and the same respondents should land in test across conditions where possible.
+- [x] `ml/src/evaluate.py`: `evaluate(model, X_test, y_test) -> dict` returning accuracy, precision, recall, F1, **ROC-AUC, PR-AUC, Brier score**, confusion matrix, and the threshold used.
+- [x] Threshold policy: report at 0.5 **and** at a recall-oriented threshold chosen on validation data (screening tools favour recall). Document the choice.
+- [x] Tests: metrics on a hand-computed tiny example; keys present; values in valid ranges.
+- [x] **Write the assignment doc** → `docs/assignments/H10-evaluation.md`.
 
 ---
 
