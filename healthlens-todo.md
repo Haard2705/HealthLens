@@ -693,11 +693,11 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Goal:** A stronger non-linear model, compared fairly against the baseline.
 **Depends on:** H10
 
-- [ ] **Plan this assignment.**
-- [ ] XGBoost with `scale_pos_weight` for imbalance; early stopping on a validation split carved from train.
-- [ ] Modest tuning (randomized search, CV on train). Don't burn a week on 0.002 AUC.
-- [ ] Optional: LightGBM on the same split and harness.
-- [ ] **Write the assignment doc** → `docs/assignments/H12-boosting.md`.
+- [x] **Plan this assignment.** _(Pivot: scale_pos_weight = 1, same reason as H11; see H12 doc.)_
+- [x] XGBoost with `scale_pos_weight` for imbalance; early stopping on a validation split carved from train.
+- [x] Modest tuning (randomized search, CV on train). Don't burn a week on 0.002 AUC.
+- [ ] Optional: LightGBM on the same split and harness. _(Not done; stretch.)_
+- [x] **Write the assignment doc** → `docs/assignments/H12-boosting.md`.
 
 ---
 
