@@ -67,6 +67,7 @@ def test_writes_model_metrics_and_meta(trained) -> None:
         "logreg.joblib",
         "metrics.json",
         "model_meta.json",
+        "explainer.joblib",
     }
 
 
@@ -188,9 +189,13 @@ def test_smoke_every_condition_both_models_300_rows(monkeypatch, tmp_path) -> No
     assert set(index) == set(REGISTRY.ids)
     for condition_id in REGISTRY.ids:
         folder = tmp_path / condition_id
-        assert {"logreg.joblib", "xgboost.joblib", "metrics.json", "model_meta.json"} <= {
-            p.name for p in folder.iterdir()
-        }
+        assert {
+            "logreg.joblib",
+            "xgboost.joblib",
+            "metrics.json",
+            "model_meta.json",
+            "explainer.joblib",
+        } <= {p.name for p in folder.iterdir()}
         metrics = strict_json(folder / "metrics.json")
         assert set(metrics["models"]) == {"logreg", "xgboost"}
         assert metrics["best_model"] in {"logreg", "xgboost"}

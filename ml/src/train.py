@@ -12,6 +12,7 @@ baseline (H11) and XGBoost (H12) on exactly the same rows, picks the best model 
     ml/models/<condition>/xgboost.joblib
     ml/models/<condition>/metrics.json        every model's metrics, best_model, how it was chosen
     ml/models/<condition>/model_meta.json     what the backend needs to call the model safely
+    ml/models/<condition>/explainer.joblib    the best model + its SHAP explainer (H14)
     ml/models/index.json                      every trained condition (merged, not overwritten)
 
 The model files are gitignored: everyone regenerates them with this command.
@@ -35,7 +36,7 @@ import numpy as np
 import pandas as pd
 import sklearn
 
-from . import config, evaluate, features, schema
+from . import config, evaluate, explain, features, schema
 from .registry import Condition, RegistryError, load_registry
 
 MODELS_DIR = config.REPO_ROOT / "ml" / "models"
@@ -219,14 +220,18 @@ def train_condition(
     folder.mkdir(parents=True, exist_ok=True)
 
     summaries: dict[str, Any] = {}
+    fitted: dict[str, Any] = {}
     validation_auc: dict[str, float] = {}
     for name in models:
         result = trainers[name](split)
         joblib.dump(result.model, folder / f"{name}.joblib")
         summaries[name] = result.summary()
+        fitted[name] = result.model
         validation_auc[name] = evaluate.evaluate(result.model, val.x, val.y)["roc_auc"]
 
     best = select_best(validation_auc)
+    explainer = explain.build_explainer(fitted[best], explain.background_sample(split.x_train))
+    joblib.dump(explainer, folder / explain.EXPLAINER_FILE)
     _write_json(
         folder / "metrics.json",
         {

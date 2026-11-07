@@ -724,12 +724,12 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Goal:** Global importance plot + per-prediction explanations, in a form the API can reuse.
 **Depends on:** H13
 
-- [ ] **Plan this assignment.**
-- [ ] `explain.py --condition <name>`: load that condition's XGBoost → `shap.TreeExplainer` → global summary (beeswarm) + bar plot saved to `docs/figures/<condition>/`.
-- [ ] `explain_one(row) -> list[{feature, value, contribution}]` sorted by absolute contribution. **This exact function is what `/predict` calls.**
-- [ ] Map one-hot/encoded columns **back to canonical feature names** so explanations read "BMI", not `num__bmi`.
-- [ ] Sanity test: base value + sum of contributions ≈ model margin output for a sample row.
-- [ ] **Write the assignment doc** → `docs/assignments/H14-shap.md`.
+- [x] **Plan this assignment.** _(Pivot: explains the condition's best model, logreg or XGBoost; native TreeSHAP / exact linear SHAP so the backend needs no `shap`; train.py saves explainer.joblib. See H14 doc.)_
+- [x] `explain.py --condition <name>`: load that condition's XGBoost → `shap.TreeExplainer` → global summary (beeswarm) + bar plot saved to `docs/figures/<condition>/`.
+- [x] `explain_one(row) -> list[{feature, value, contribution}]` sorted by absolute contribution. **This exact function is what `/predict` calls.**
+- [x] Map one-hot/encoded columns **back to canonical feature names** so explanations read "BMI", not `num__bmi`.
+- [x] Sanity test: base value + sum of contributions ≈ model margin output for a sample row.
+- [x] **Write the assignment doc** → `docs/assignments/H14-shap.md`.
 
 ---
 
@@ -757,7 +757,7 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 - [ ] `ml/src/conditions.yaml` (or `.json`): per condition: `id`, `display_name`, `body_system`, `tier`, `outcome_column` (canonical name), `exclude_features` (the outcome itself plus anything that defines it, e.g. `high_bp` for hypertension), `sensitive` (true for depression), patient-facing and clinician-facing wording, and a short plain-language "what this is".
 - [ ] `ml/src/registry.py`: loads and **validates** the file (every `outcome_column` exists in the canonical schema; no condition lists its own outcome as a feature; ids are unique). Fails loudly with a clear message.
 - [ ] Tests first: a registry that excludes nothing for hypertension is rejected; an unknown outcome column is rejected; a valid 2-condition registry loads; no module outside `registry.py` hard-codes a disease name (enforce with a grep test, like H07).
-- [ ] Generalise `train.py`, `explain.py`, `evaluate.py` to take `--condition` (H13/H14 reference this). _(evaluate.py: H10; train.py: H13; explain.py: H14.)_
+- [x] Generalise `train.py`, `explain.py`, `evaluate.py` to take `--condition` (H13/H14 reference this). _(Done: evaluate.py H10, train.py H13, explain.py H14.)_
 - [ ] **Auto-generated model card** for each condition from `metrics.json` and the registry text (the Tier 2 path; Tier 1 cards are then hand-edited in H15).
 - [ ] Start with **diabetes only** in the registry and get it green end-to-end, then add hypertension and heart disease, then the Tier 2 six. If a condition's data can't be mapped cleanly by the freeze, leave it out.
 - [ ] **Write the assignment doc** → `docs/assignments/H49-condition-registry.md`.
