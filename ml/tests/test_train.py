@@ -152,7 +152,12 @@ def test_main_one_condition_logreg_only(monkeypatch, tmp_path, capsys) -> None:
     args = ["--condition", SECOND.id, "--models", "logreg", "--fast", "--out", str(tmp_path)]
     assert train.main(args) == 0
     assert (tmp_path / SECOND.id / "metrics.json").exists()
-    assert set(strict_json(tmp_path / "index.json")["conditions"]) == {SECOND.id}
+    index = strict_json(tmp_path / "index.json")["conditions"]
+    # Only SECOND was trained; the release gate (H50) lists every condition for the UI.
+    assert set(index) == set(REGISTRY.ids)
+    assert index[SECOND.id]["status"] == "trained"
+    assert all(index[c]["prediction_enabled"] is False for c in REGISTRY.ids if c != SECOND.id)
+    assert "prediction_enabled" in index[SECOND.id]
     assert SECOND.id in capsys.readouterr().out
 
 

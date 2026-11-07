@@ -13,7 +13,8 @@ baseline (H11) and XGBoost (H12) on exactly the same rows, picks the best model 
     ml/models/<condition>/metrics.json        every model's metrics, best_model, how it was chosen
     ml/models/<condition>/model_meta.json     what the backend needs to call the model safely
     ml/models/<condition>/explainer.joblib    the best model + its SHAP explainer (H14)
-    ml/models/index.json                      every trained condition (merged, not overwritten)
+    ml/models/index.json                      every trained condition (merged, not overwritten),
+                                              with the H50 release-gate decision for each
 
 The model files are gitignored: everyone regenerates them with this command.
 """
@@ -36,7 +37,7 @@ import numpy as np
 import pandas as pd
 import sklearn
 
-from . import config, evaluate, explain, features, schema
+from . import config, evaluate, explain, features, gate, schema
 from .registry import Condition, RegistryError, load_registry
 
 MODELS_DIR = config.REPO_ROOT / "ml" / "models"
@@ -318,6 +319,7 @@ def main(argv: list[str] | None = None) -> int:
         entries[condition.id] = entry
 
     update_index(args.out, entries)
+    gate.gate_file(args.out, registry)  # H50: which conditions may show personal estimates
     print(f"saved to {args.out}")
     return 1 if failed else 0
 

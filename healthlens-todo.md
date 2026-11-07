@@ -774,11 +774,11 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Why it matters:** A model with ROC-AUC 0.58 that still prints "your risk is 34%" is worse than no model. This is where we show judgement, and it's the answer to "why not predict everything?".
 **Depends on:** H13, H49
 
-- [ ] **Plan this assignment.** Agree thresholds as a team and write them in ADR-0016. Suggested starting point: held-out ROC-AUC ≥ 0.70, calibration better than the no-skill baseline (Brier), and `sensitive: false`. Revisit after seeing real numbers.
-- [ ] `ml/src/gate.py`: reads each condition's `metrics.json` and the registry, writes `prediction_enabled`, `signal_strength` (strong ≥ 0.80, moderate 0.70–0.80, weak < 0.70; adjust with the team), and the reason, into `ml/models/index.json`.
-- [ ] Tests first: a synthetic metrics file below the threshold is disabled; a sensitive condition is disabled regardless of score; reasons are human-readable.
-- [ ] The API and UI only _read_ this result (H19, H24, H25, H40); they never re-implement the rule.
-- [ ] **Write the assignment doc** → `docs/assignments/H50-release-gate.md`.
+- [x] **Plan this assignment.** _(ADR-0016 written as Proposed with the suggested thresholds; team to confirm after the real run.)_ Agree thresholds as a team and write them in ADR-0016. Suggested starting point: held-out ROC-AUC ≥ 0.70, calibration better than the no-skill baseline (Brier), and `sensitive: false`. Revisit after seeing real numbers.
+- [x] `ml/src/gate.py`: reads each condition's `metrics.json` and the registry, writes `prediction_enabled`, `signal_strength` (strong ≥ 0.80, moderate 0.70–0.80, weak < 0.70; adjust with the team), and the reason, into `ml/models/index.json`.
+- [x] Tests first: a synthetic metrics file below the threshold is disabled; a sensitive condition is disabled regardless of score; reasons are human-readable.
+- [x] The API and UI only _read_ this result (H19, H24, H25, H40); they never re-implement the rule.
+- [x] **Write the assignment doc** → `docs/assignments/H50-release-gate.md`.
 
 **Acceptance Criteria:**
 
