@@ -30,6 +30,11 @@ This also completes H49's "auto-generated model card for each condition".
   unweighted training.
 - **Wording lives in the generator**, not in hand-edited cards, so retraining never loses
   edits. Change `ml/src/model_card.py` to change the text.
+- **Safety check: the card refuses to mix data.** It re-creates the test split from the
+  processed file, so if that file changed since training (row or case counts differ from
+  `model_meta.json`), it stops with "retrain first" instead of describing the wrong people.
+- **Groups come from the full data rows**, not the model inputs, so they still work if a
+  condition ever excludes sex, age or income as a predictor.
 - Race/ethnicity subgroups aren't reported because race isn't a feature (ADR-0003); the
   team may want to add it as a *reporting-only* group later.
 
@@ -48,8 +53,9 @@ python -m pytest ml/tests/test_model_card.py
 python -m ml.src.train && python -m ml.src.model_card   # needs the processed BRFSS file
 ```
 
-17 tests: readable groups and their order, subgroup metrics against a hand-worked example,
-small groups skipped, calibration bins, chart written, general + automatic limitation
+20 tests: readable groups and their order, subgroup metrics against a hand-worked example,
+small groups (and groups with no cases) skipped, refusal when the data changed since
+training, image link resolves, calibration bins, chart written, general + automatic limitation
 sentences, every card section present, Tier 1 vs Tier 2 content, `limitations.json`, CLI.
 
 ## Results

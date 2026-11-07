@@ -56,11 +56,18 @@ def test_groups_are_listed_in_natural_order() -> None:
     assert [r["group"] for r in rows] == ["under $35k", "$35k-$100k", "$100k+", "not stated"]
 
 
+def test_a_big_group_where_nobody_reports_it_is_not_scored() -> None:
+    groups = pd.DataFrame({"sex": ["a"] * 100})
+    (row,) = model_card.subgroup_metrics(np.zeros(100), np.full(100, 0.1), groups, 0.5)
+    assert row["n"] == 100 and row["recall"] is None
+    assert row["note"] == "too few people or cases"
+
+
 def test_small_groups_are_not_scored() -> None:
     y = np.array([1, 0, 1, 0])
     groups = pd.DataFrame({"sex": ["b"] * 4})
     (row,) = model_card.subgroup_metrics(y, np.array([0.6, 0.4, 0.3, 0.2]), groups, 0.5)
-    assert row["recall"] is None and row["note"] == "too few people"
+    assert row["recall"] is None and row["note"] == "too few people or cases"
 
 
 # ---- calibration ------------------------------------------------------------------------
@@ -197,3 +204,25 @@ def test_cli_unknown_condition(monkeypatch, capsys) -> None:
     monkeypatch.setattr(evaluate, "load_processed", lambda path: signal_frame(n=300))
     assert model_card.main(["--condition", "nope"]) == 1
     assert "unknown condition" in capsys.readouterr().err
+
+
+def test_card_image_link_points_at_the_real_file(built) -> None:
+    _, _, cards, _ = built
+    text = (cards / f"{TIER1.id}.md").read_text()
+    link = text.split("![Calibration](")[1].split(")")[0]
+    assert not link.startswith("/")
+    assert (cards / link).resolve().exists()
+
+
+def test_refuses_when_data_changed_since_training(tmp_path, capsys) -> None:
+    mp = pytest.MonkeyPatch()
+    models = tmp_path / "models"
+    mp.setattr(evaluate, "load_processed", lambda path: signal_frame(n=1500))
+    train.main(["--condition", TIER1.id, "--models", "logreg", "--fast", "--out", str(models)])
+    mp.setattr(evaluate, "load_processed", lambda path: signal_frame(n=1600))  # file changed
+    args = ["--condition", TIER1.id, "--models-dir", str(models), "--cards-dir", str(tmp_path)]
+    code = model_card.main([*args, "--figures-dir", str(tmp_path / "f")])
+    mp.undo()
+    assert code == 1
+    assert "changed since training" in capsys.readouterr().err
+    assert not (tmp_path / f"{TIER1.id}.md").exists()

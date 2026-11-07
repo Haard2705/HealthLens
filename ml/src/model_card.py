@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -107,8 +108,8 @@ def subgroup_metrics(
 ) -> list[dict[str, Any]]:
     """Recall, PR-AUC and calibration per group, at the model's recall-oriented threshold.
 
-    Groups with fewer than MIN_GROUP_ROWS rows, or without both outcomes, get no metrics
-    (too few people to say anything reliable) and a note saying so.
+    Groups with fewer than MIN_GROUP_ROWS rows, or where nobody (or everybody) reports the
+    condition, get no metrics (nothing reliable to say) and a note saying so.
     """
     y = pd.Series(np.asarray(y), index=groups.index).astype(int)
     p = pd.Series(np.asarray(scores, dtype=float), index=groups.index)
@@ -127,7 +128,9 @@ def subgroup_metrics(
                 "mean_predicted": float(pg.mean()),
             }
             if len(yg) < MIN_GROUP_ROWS or yg.nunique() < 2:
-                row.update(recall=None, pr_auc=None, calibration_gap=None, note="too few people")
+                row.update(
+                    recall=None, pr_auc=None, calibration_gap=None, note="too few people or cases"
+                )
             else:
                 caught = int(((pg >= threshold) & (yg == 1)).sum())
                 row.update(
@@ -332,6 +335,31 @@ def render_card(
 # --------------------------------------------------------------------------
 
 
+class DataChangedError(RuntimeError):
+    """The processed data no longer matches what the models were trained on."""
+
+
+def check_same_data(meta: dict[str, Any], split: evaluate.Split) -> None:
+    """Stop if today's split differs from the one recorded at training time.
+
+    The card re-creates the test split from the processed file. If that file changed since
+    `train.py` ran, the card would score the models on different people than metrics.json
+    describes, so refuse rather than mix the two.
+    """
+    now = {
+        "train": len(split.y_train),
+        "test": len(split.y_test),
+        "positives_train": int(split.y_train.sum()),
+        "positives_test": int(split.y_test.sum()),
+    }
+    recorded = {k: meta["rows"][k] for k in now}
+    if now != recorded:
+        raise DataChangedError(
+            f"{meta['condition']}: the processed data has changed since training "
+            f"(trained on {recorded}, now {now}). Retrain with python -m ml.src.train first."
+        )
+
+
 def build_card(
     df: pd.DataFrame,
     condition: Condition,
@@ -348,6 +376,7 @@ def build_card(
     gate_entry = index.get("conditions", {}).get(condition.id, {})
 
     split = evaluate.split_condition(df, condition.id)
+    check_same_data(meta, split)
     curves, scores = {}, {}
     for name in metrics["models"]:
         model = joblib.load(folder / f"{name}.joblib")
@@ -364,7 +393,12 @@ def build_card(
     subgroups = None
     if with_subgroups:
         subgroups = subgroup_metrics(
-            split.y_test, scores[best], subgroup_labels(split.x_test), recall_point["threshold"]
+            split.y_test,
+            scores[best],
+            # Full rows, not model inputs: grouping must work even if a condition excludes
+            # sex, age or income as a predictor.
+            subgroup_labels(df.loc[split.x_test.index]),
+            recall_point["threshold"],
         )
     limits = limitations(subgroups or [], recall_point["recall"])
     (folder / "limitations.json").write_text(
@@ -374,9 +408,7 @@ def build_card(
 
     cards_dir.mkdir(parents=True, exist_ok=True)
     card_path = cards_dir / f"{condition.id}.md"
-    relative_figure = Path("..") / "figures" / condition.id / figure.name
-    if figures_dir.resolve() != FIGURES_DIR.resolve():
-        relative_figure = figure
+    relative_figure = Path(os.path.relpath(figure.resolve(), cards_dir.resolve())).as_posix()
     card_path.write_text(
         render_card(condition, metrics, meta, gate_entry, subgroups, limits, str(relative_figure)),
         encoding="utf-8",
@@ -409,14 +441,18 @@ def main(argv: list[str] | None = None) -> int:
         if not (args.models_dir / condition.id / "metrics.json").exists():
             print(f"{condition.id}: not trained yet (run python -m ml.src.train)", file=sys.stderr)
             continue
-        path = build_card(
-            df,
-            condition,
-            args.models_dir,
-            args.cards_dir,
-            args.figures_dir,
-            with_subgroups=args.subgroups or condition.tier == 1,
-        )
+        try:
+            path = build_card(
+                df,
+                condition,
+                args.models_dir,
+                args.cards_dir,
+                args.figures_dir,
+                with_subgroups=args.subgroups or condition.tier == 1,
+            )
+        except DataChangedError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
         print(f"{condition.id}: wrote {path}")
         written += 1
     return 0 if written else 1
