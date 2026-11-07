@@ -642,11 +642,11 @@ _Goal: raw survey file → validated, canonical, model-ready DataFrame, with the
 **Goal:** The lifestyle/health-factor features from the P1/P2 plan, built on canonical columns only.
 **Depends on:** H08
 
-- [ ] **Plan this assignment.** Pull the feature list from P1/P2.
-- [ ] Tests first for each feature (e.g. `bmi_band` boundaries 18.5/25/30, `risk_factor_count`, `lifestyle_score`).
-- [ ] `ml/src/features.py`: stateless row-wise features here. **Stateful transforms (scaling, imputation, one-hot) go in the sklearn `Pipeline`**, so they're fit on train only.
-- [ ] Build `build_preprocessor()` returning a `ColumnTransformer` shared by all models.
-- [ ] **Write the assignment doc** → `docs/assignments/H09-features.md`.
+- [x] **Plan this assignment.** Pull the feature list from P1/P2.
+- [x] Tests first for each feature (e.g. `bmi_band` boundaries 18.5/25/30, `risk_factor_count`, `lifestyle_score`).
+- [x] `ml/src/features.py`: stateless row-wise features here. **Stateful transforms (scaling, imputation, one-hot) go in the sklearn `Pipeline`**, so they're fit on train only.
+- [x] Build `build_preprocessor()` returning a `ColumnTransformer` shared by all models.
+- [x] **Write the assignment doc** → `docs/assignments/H09-features.md`.
 
 **Acceptance Criteria:**
 
@@ -666,12 +666,12 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Why it matters:** If every model is evaluated differently, the comparison is meaningless.
 **Depends on:** H09
 
-- [ ] **Plan this assignment.**
-- [ ] Stratified train/test split (e.g. 80/20) with a fixed seed, **after** dedup. **One split per condition**: rows with a missing outcome for that condition are dropped first, and the same respondents should land in test across conditions where possible.
-- [ ] `ml/src/evaluate.py`: `evaluate(model, X_test, y_test) -> dict` returning accuracy, precision, recall, F1, **ROC-AUC, PR-AUC, Brier score**, confusion matrix, and the threshold used.
-- [ ] Threshold policy: report at 0.5 **and** at a recall-oriented threshold chosen on validation data (screening tools favour recall). Document the choice.
-- [ ] Tests: metrics on a hand-computed tiny example; keys present; values in valid ranges.
-- [ ] **Write the assignment doc** → `docs/assignments/H10-evaluation.md`.
+- [x] **Plan this assignment.** _(Shared per-respondent draw so test sets overlap across conditions; recall target 0.8 chosen on validation; see H10 doc.)_
+- [x] Stratified train/test split (e.g. 80/20) with a fixed seed, **after** dedup. **One split per condition**: rows with a missing outcome for that condition are dropped first, and the same respondents should land in test across conditions where possible.
+- [x] `ml/src/evaluate.py`: `evaluate(model, X_test, y_test) -> dict` returning accuracy, precision, recall, F1, **ROC-AUC, PR-AUC, Brier score**, confusion matrix, and the threshold used.
+- [x] Threshold policy: report at 0.5 **and** at a recall-oriented threshold chosen on validation data (screening tools favour recall). Document the choice.
+- [x] Tests: metrics on a hand-computed tiny example; keys present; values in valid ranges.
+- [x] **Write the assignment doc** → `docs/assignments/H10-evaluation.md`.
 
 ---
 
@@ -680,11 +680,11 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Goal:** A fast, interpretable floor to beat.
 **Depends on:** H10
 
-- [ ] **Plan this assignment.**
-- [ ] `Pipeline(preprocessor, LogisticRegression(class_weight="balanced", max_iter=…))`.
-- [ ] Small CV grid on `C` using the training set only.
-- [ ] Save coefficients (odds ratios) for the report.
-- [ ] **Write the assignment doc** → `docs/assignments/H11-logreg.md`.
+- [x] **Plan this assignment.** _(Pivot: no class re-weighting; "balanced" inflated probabilities past the no-skill Brier. Imbalance handled by H10's recall-oriented threshold. See H11 doc.)_
+- [x] `Pipeline(preprocessor, LogisticRegression(class_weight="balanced", max_iter=…))`.
+- [x] Small CV grid on `C` using the training set only.
+- [x] Save coefficients (odds ratios) for the report.
+- [x] **Write the assignment doc** → `docs/assignments/H11-logreg.md`.
 
 ---
 
@@ -693,11 +693,11 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Goal:** A stronger non-linear model, compared fairly against the baseline.
 **Depends on:** H10
 
-- [ ] **Plan this assignment.**
-- [ ] XGBoost with `scale_pos_weight` for imbalance; early stopping on a validation split carved from train.
-- [ ] Modest tuning (randomized search, CV on train). Don't burn a week on 0.002 AUC.
-- [ ] Optional: LightGBM on the same split and harness.
-- [ ] **Write the assignment doc** → `docs/assignments/H12-boosting.md`.
+- [x] **Plan this assignment.** _(Pivot: scale_pos_weight = 1, same reason as H11; see H12 doc.)_
+- [x] XGBoost with `scale_pos_weight` for imbalance; early stopping on a validation split carved from train.
+- [x] Modest tuning (randomized search, CV on train). Don't burn a week on 0.002 AUC.
+- [ ] Optional: LightGBM on the same split and harness. _(Not done; stretch.)_
+- [x] **Write the assignment doc** → `docs/assignments/H12-boosting.md`.
 
 ---
 
@@ -706,12 +706,12 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Goal:** `python ml/src/train.py` trains every model for every condition end-to-end and saves artifacts the backend loads.
 **Depends on:** H11, H12, H49
 
-- [ ] **Plan this assignment.**
-- [ ] `train.py`: load processed data → **for each condition in the registry (H49)** → split → train each model → evaluate → save `ml/models/<condition>/<name>.joblib`. `python ml/src/train.py --condition diabetes` trains one; no flag trains all.
-- [ ] `ml/models/<condition>/metrics.json`: per-model metrics, plus `best_model` and selection criterion; a top-level `ml/models/index.json` lists every trained condition.
-- [ ] `ml/models/<condition>/model_meta.json`: condition, data source, row counts, feature list (canonical order, **after the registry's exclusions**), seed, library versions, git SHA, timestamp. The backend validates requests against this feature list.
-- [ ] Smoke test: `train.py` runs end-to-end on a 300-row synthetic dataset in CI (< 30 s) and writes valid JSON.
-- [ ] **Write the assignment doc** → `docs/assignments/H13-train.md`.
+- [x] **Plan this assignment.** _(Best model chosen on validation ROC-AUC, near-ties to logreg; run as `python -m ml.src.train`; see H13 doc.)_
+- [x] `train.py`: load processed data → **for each condition in the registry (H49)** → split → train each model → evaluate → save `ml/models/<condition>/<name>.joblib`. `python ml/src/train.py --condition diabetes` trains one; no flag trains all.
+- [x] `ml/models/<condition>/metrics.json`: per-model metrics, plus `best_model` and selection criterion; a top-level `ml/models/index.json` lists every trained condition.
+- [x] `ml/models/<condition>/model_meta.json`: condition, data source, row counts, feature list (canonical order, **after the registry's exclusions**), seed, library versions, git SHA, timestamp. The backend validates requests against this feature list.
+- [x] Smoke test: `train.py` runs end-to-end on a 300-row synthetic dataset in CI (< 30 s) and writes valid JSON.
+- [x] **Write the assignment doc** → `docs/assignments/H13-train.md`.
 
 **Acceptance Criteria:**
 
@@ -724,12 +724,12 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Goal:** Global importance plot + per-prediction explanations, in a form the API can reuse.
 **Depends on:** H13
 
-- [ ] **Plan this assignment.**
-- [ ] `explain.py --condition <name>`: load that condition's XGBoost → `shap.TreeExplainer` → global summary (beeswarm) + bar plot saved to `docs/figures/<condition>/`.
-- [ ] `explain_one(row) -> list[{feature, value, contribution}]` sorted by absolute contribution. **This exact function is what `/predict` calls.**
-- [ ] Map one-hot/encoded columns **back to canonical feature names** so explanations read "BMI", not `num__bmi`.
-- [ ] Sanity test: base value + sum of contributions ≈ model margin output for a sample row.
-- [ ] **Write the assignment doc** → `docs/assignments/H14-shap.md`.
+- [x] **Plan this assignment.** _(Pivot: explains the condition's best model, logreg or XGBoost; native TreeSHAP / exact linear SHAP so the backend needs no `shap`; train.py saves explainer.joblib. See H14 doc.)_
+- [x] `explain.py --condition <name>`: load that condition's XGBoost → `shap.TreeExplainer` → global summary (beeswarm) + bar plot saved to `docs/figures/<condition>/`.
+- [x] `explain_one(row) -> list[{feature, value, contribution}]` sorted by absolute contribution. **This exact function is what `/predict` calls.**
+- [x] Map one-hot/encoded columns **back to canonical feature names** so explanations read "BMI", not `num__bmi`.
+- [x] Sanity test: base value + sum of contributions ≈ model margin output for a sample row.
+- [x] **Write the assignment doc** → `docs/assignments/H14-shap.md`.
 
 ---
 
@@ -757,7 +757,7 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 - [ ] `ml/src/conditions.yaml` (or `.json`): per condition: `id`, `display_name`, `body_system`, `tier`, `outcome_column` (canonical name), `exclude_features` (the outcome itself plus anything that defines it, e.g. `high_bp` for hypertension), `sensitive` (true for depression), patient-facing and clinician-facing wording, and a short plain-language "what this is".
 - [ ] `ml/src/registry.py`: loads and **validates** the file (every `outcome_column` exists in the canonical schema; no condition lists its own outcome as a feature; ids are unique). Fails loudly with a clear message.
 - [ ] Tests first: a registry that excludes nothing for hypertension is rejected; an unknown outcome column is rejected; a valid 2-condition registry loads; no module outside `registry.py` hard-codes a disease name (enforce with a grep test, like H07).
-- [ ] Generalise `train.py`, `explain.py`, `evaluate.py` to take `--condition` (H13/H14 reference this).
+- [x] Generalise `train.py`, `explain.py`, `evaluate.py` to take `--condition` (H13/H14 reference this). _(Done: evaluate.py H10, train.py H13, explain.py H14.)_
 - [ ] **Auto-generated model card** for each condition from `metrics.json` and the registry text (the Tier 2 path; Tier 1 cards are then hand-edited in H15).
 - [ ] Start with **diabetes only** in the registry and get it green end-to-end, then add hypertension and heart disease, then the Tier 2 six. If a condition's data can't be mapped cleanly by the freeze, leave it out.
 - [ ] **Write the assignment doc** → `docs/assignments/H49-condition-registry.md`.
