@@ -706,12 +706,12 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Goal:** `python ml/src/train.py` trains every model for every condition end-to-end and saves artifacts the backend loads.
 **Depends on:** H11, H12, H49
 
-- [ ] **Plan this assignment.**
-- [ ] `train.py`: load processed data → **for each condition in the registry (H49)** → split → train each model → evaluate → save `ml/models/<condition>/<name>.joblib`. `python ml/src/train.py --condition diabetes` trains one; no flag trains all.
-- [ ] `ml/models/<condition>/metrics.json`: per-model metrics, plus `best_model` and selection criterion; a top-level `ml/models/index.json` lists every trained condition.
-- [ ] `ml/models/<condition>/model_meta.json`: condition, data source, row counts, feature list (canonical order, **after the registry's exclusions**), seed, library versions, git SHA, timestamp. The backend validates requests against this feature list.
-- [ ] Smoke test: `train.py` runs end-to-end on a 300-row synthetic dataset in CI (< 30 s) and writes valid JSON.
-- [ ] **Write the assignment doc** → `docs/assignments/H13-train.md`.
+- [x] **Plan this assignment.** _(Best model chosen on validation ROC-AUC, near-ties to logreg; run as `python -m ml.src.train`; see H13 doc.)_
+- [x] `train.py`: load processed data → **for each condition in the registry (H49)** → split → train each model → evaluate → save `ml/models/<condition>/<name>.joblib`. `python ml/src/train.py --condition diabetes` trains one; no flag trains all.
+- [x] `ml/models/<condition>/metrics.json`: per-model metrics, plus `best_model` and selection criterion; a top-level `ml/models/index.json` lists every trained condition.
+- [x] `ml/models/<condition>/model_meta.json`: condition, data source, row counts, feature list (canonical order, **after the registry's exclusions**), seed, library versions, git SHA, timestamp. The backend validates requests against this feature list.
+- [x] Smoke test: `train.py` runs end-to-end on a 300-row synthetic dataset in CI (< 30 s) and writes valid JSON.
+- [x] **Write the assignment doc** → `docs/assignments/H13-train.md`.
 
 **Acceptance Criteria:**
 
@@ -757,7 +757,7 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 - [ ] `ml/src/conditions.yaml` (or `.json`): per condition: `id`, `display_name`, `body_system`, `tier`, `outcome_column` (canonical name), `exclude_features` (the outcome itself plus anything that defines it, e.g. `high_bp` for hypertension), `sensitive` (true for depression), patient-facing and clinician-facing wording, and a short plain-language "what this is".
 - [ ] `ml/src/registry.py`: loads and **validates** the file (every `outcome_column` exists in the canonical schema; no condition lists its own outcome as a feature; ids are unique). Fails loudly with a clear message.
 - [ ] Tests first: a registry that excludes nothing for hypertension is rejected; an unknown outcome column is rejected; a valid 2-condition registry loads; no module outside `registry.py` hard-codes a disease name (enforce with a grep test, like H07).
-- [ ] Generalise `train.py`, `explain.py`, `evaluate.py` to take `--condition` (H13/H14 reference this).
+- [ ] Generalise `train.py`, `explain.py`, `evaluate.py` to take `--condition` (H13/H14 reference this). _(evaluate.py: H10; train.py: H13; explain.py: H14.)_
 - [ ] **Auto-generated model card** for each condition from `metrics.json` and the registry text (the Tier 2 path; Tier 1 cards are then hand-edited in H15).
 - [ ] Start with **diabetes only** in the registry and get it green end-to-end, then add hypertension and heart disease, then the Tier 2 six. If a condition's data can't be mapped cleanly by the freeze, leave it out.
 - [ ] **Write the assignment doc** → `docs/assignments/H49-condition-registry.md`.
