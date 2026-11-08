@@ -753,14 +753,14 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Why it matters:** This is the decision that makes "many diseases" affordable. Without it, each new condition costs a copy-pasted pipeline and a pile of `if condition == …`.
 **Depends on:** H07, H09
 
-- [ ] **Plan this assignment.** Agree the Tier 1 and Tier 2 lists (§5.4) as a team, and the registry's fields.
-- [ ] `ml/src/conditions.yaml` (or `.json`): per condition: `id`, `display_name`, `body_system`, `tier`, `outcome_column` (canonical name), `exclude_features` (the outcome itself plus anything that defines it, e.g. `high_bp` for hypertension), `sensitive` (true for depression), patient-facing and clinician-facing wording, and a short plain-language "what this is".
-- [ ] `ml/src/registry.py`: loads and **validates** the file (every `outcome_column` exists in the canonical schema; no condition lists its own outcome as a feature; ids are unique). Fails loudly with a clear message.
-- [ ] Tests first: a registry that excludes nothing for hypertension is rejected; an unknown outcome column is rejected; a valid 2-condition registry loads; no module outside `registry.py` hard-codes a disease name (enforce with a grep test, like H07).
+- [x] **Plan this assignment.** _(Team agreed nine conditions, ADR-0015.)_ Agree the Tier 1 and Tier 2 lists (§5.4) as a team, and the registry's fields.
+- [x] `ml/src/conditions.yaml` _(Pivot: opt-in `comorbidity_features` instead of `exclude_features`; wording = display_name + description + optional patient_name from H46.)_ (or `.json`): per condition: `id`, `display_name`, `body_system`, `tier`, `outcome_column` (canonical name), `exclude_features` (the outcome itself plus anything that defines it, e.g. `high_bp` for hypertension), `sensitive` (true for depression), patient-facing and clinician-facing wording, and a short plain-language "what this is".
+- [x] `ml/src/registry.py`: loads and **validates** the file (every `outcome_column` exists in the canonical schema; no condition lists its own outcome as a feature; ids are unique). Fails loudly with a clear message.
+- [x] Tests first: a registry that excludes nothing for hypertension is rejected; an unknown outcome column is rejected; a valid 2-condition registry loads; no module outside `registry.py` hard-codes a disease name (enforce with a grep test, like H07).
 - [x] Generalise `train.py`, `explain.py`, `evaluate.py` to take `--condition` (H13/H14 reference this). _(Done: evaluate.py H10, train.py H13, explain.py H14.)_
 - [x] **Auto-generated model card** for each condition from `metrics.json` and the registry text (the Tier 2 path; Tier 1 cards are then hand-edited in H15).
-- [ ] Start with **diabetes only** in the registry and get it green end-to-end, then add hypertension and heart disease, then the Tier 2 six. If a condition's data can't be mapped cleanly by the freeze, leave it out.
-- [ ] **Write the assignment doc** → `docs/assignments/H49-condition-registry.md`.
+- [x] _(All nine mapped together in H07.)_ Start with **diabetes only** in the registry and get it green end-to-end, then add hypertension and heart disease, then the Tier 2 six. If a condition's data can't be mapped cleanly by the freeze, leave it out.
+- [x] **Write the assignment doc** → `docs/assignments/H49-condition-registry.md`.
 
 **Acceptance Criteria:**
 
