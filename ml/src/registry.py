@@ -37,7 +37,7 @@ _NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 _REQUIRED_FIELDS = frozenset(
     {"id", "display_name", "body_system", "tier", "source", "outcome_column", "description"}
 )
-_OPTIONAL_FIELDS = frozenset({"sensitive", "comorbidity_features"})
+_OPTIONAL_FIELDS = frozenset({"sensitive", "comorbidity_features", "patient_name"})
 _ALL_FIELDS = _REQUIRED_FIELDS | _OPTIONAL_FIELDS
 
 
@@ -58,6 +58,18 @@ class Condition:
     description: str
     sensitive: bool = False
     comorbidity_features: tuple[str, ...] = ()
+    patient_name: str = ""
+
+    @property
+    def plain_name(self) -> str:
+        """How to name the condition in a sentence to a patient ("high blood pressure").
+
+        Falls back to the display name, lower-cased unless it's an all-capitals acronym.
+        """
+        if self.patient_name:
+            return self.patient_name
+        name = self.display_name
+        return name if name.isupper() else name[0].lower() + name[1:]
 
 
 @dataclass(frozen=True)
@@ -147,6 +159,10 @@ def _parse_entry(entry: Any, index: int, errors: list[str]) -> Condition | None:
         errors.append(f"{label}: comorbidity_features must be a list of column names")
         comorbidity = []
 
+    patient_name = entry.get("patient_name", "")
+    if not isinstance(patient_name, str):
+        errors.append(f"{label}: patient_name must be a string")
+
     if len(errors) > before:
         return None
     return Condition(
@@ -159,6 +175,7 @@ def _parse_entry(entry: Any, index: int, errors: list[str]) -> Condition | None:
         description=entry["description"].strip(),
         sensitive=sensitive,
         comorbidity_features=tuple(comorbidity),
+        patient_name=patient_name.strip(),
     )
 
 

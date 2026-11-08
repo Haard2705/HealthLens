@@ -1186,13 +1186,13 @@ _Goal: an explanation of predictions and an AI assistant, with safety built in r
 
 **Depends on:** H14, H40
 
-- [ ] **Plan this assignment.**
-- [ ] **Deterministic first:** turn the SHAP contributions into readable sentences from templates ("Your BMI is the biggest factor raising this estimate; being physically active lowers it."). Tested with golden examples, no AI required.
-- [ ] Two reading levels: clinician and patient.
-- [ ] Condition-specific wording comes from the registry (H49), so a new condition needs no new code; sensitive conditions get softer, non-alarming wording.
-- [ ] Optional: LLM rewording behind H45, with a check that the rewording doesn't add or remove any factor.
-- [ ] Never states a diagnosis; always links the limitations.
-- [ ] **Write the assignment doc** → `docs/assignments/H46-explanations.md`.
+- [x] **Plan this assignment.** _(Template layer built on H14 only; registry gains optional `patient_name`; AI rewording left for when H45 exists. See H46 doc.)_
+- [x] **Deterministic first:** turn the SHAP contributions into readable sentences from templates ("Your BMI is the biggest factor raising this estimate; being physically active lowers it."). Tested with golden examples, no AI required.
+- [x] Two reading levels: clinician and patient.
+- [x] Condition-specific wording comes from the registry (H49), so a new condition needs no new code; sensitive conditions get softer, non-alarming wording.
+- [ ] Optional: LLM rewording behind H45 _(not done: H45 not built yet; `describe()` returns a `factors` list to check against)_, with a check that the rewording doesn't add or remove any factor.
+- [x] Never states a diagnosis; always links the limitations.
+- [x] **Write the assignment doc** → `docs/assignments/H46-explanations.md`.
 
 ---
 
