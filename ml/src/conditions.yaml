@@ -17,6 +17,8 @@
 #   sensitive             true = analytics only, never an individual prediction (see H50)
 #   comorbidity_features  optional: other conditions' outcome columns this model may use
 #                         as predictors. Empty by default: other outcomes are NOT predictors.
+#   patient_name          optional: how to name it in a sentence to a patient (H46),
+#                         e.g. "high blood pressure". Default: display_name in lower case.
 #
 # Raw survey variable names never appear here. They live in the source adapter (H07).
 
@@ -32,6 +34,7 @@ conditions:
 
   - id: hypertension
     display_name: Hypertension
+    patient_name: high blood pressure
     body_system: cardiometabolic
     tier: 1
     source: brfss
@@ -65,6 +68,7 @@ conditions:
 
   - id: copd
     display_name: COPD
+    patient_name: COPD (a long-term lung condition)
     body_system: respiratory
     tier: 2
     source: brfss

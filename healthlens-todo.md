@@ -680,11 +680,11 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Goal:** A fast, interpretable floor to beat.
 **Depends on:** H10
 
-- [ ] **Plan this assignment.**
-- [ ] `Pipeline(preprocessor, LogisticRegression(class_weight="balanced", max_iter=…))`.
-- [ ] Small CV grid on `C` using the training set only.
-- [ ] Save coefficients (odds ratios) for the report.
-- [ ] **Write the assignment doc** → `docs/assignments/H11-logreg.md`.
+- [x] **Plan this assignment.** _(Pivot: no class re-weighting; "balanced" inflated probabilities past the no-skill Brier. Imbalance handled by H10's recall-oriented threshold. See H11 doc.)_
+- [x] `Pipeline(preprocessor, LogisticRegression(class_weight="balanced", max_iter=…))`.
+- [x] Small CV grid on `C` using the training set only.
+- [x] Save coefficients (odds ratios) for the report.
+- [x] **Write the assignment doc** → `docs/assignments/H11-logreg.md`.
 
 ---
 
@@ -693,11 +693,11 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Goal:** A stronger non-linear model, compared fairly against the baseline.
 **Depends on:** H10
 
-- [ ] **Plan this assignment.**
-- [ ] XGBoost with `scale_pos_weight` for imbalance; early stopping on a validation split carved from train.
-- [ ] Modest tuning (randomized search, CV on train). Don't burn a week on 0.002 AUC.
-- [ ] Optional: LightGBM on the same split and harness.
-- [ ] **Write the assignment doc** → `docs/assignments/H12-boosting.md`.
+- [x] **Plan this assignment.** _(Pivot: scale_pos_weight = 1, same reason as H11; see H12 doc.)_
+- [x] XGBoost with `scale_pos_weight` for imbalance; early stopping on a validation split carved from train.
+- [x] Modest tuning (randomized search, CV on train). Don't burn a week on 0.002 AUC.
+- [ ] Optional: LightGBM on the same split and harness. _(Not done; stretch.)_
+- [x] **Write the assignment doc** → `docs/assignments/H12-boosting.md`.
 
 ---
 
@@ -706,12 +706,12 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Goal:** `python ml/src/train.py` trains every model for every condition end-to-end and saves artifacts the backend loads.
 **Depends on:** H11, H12, H49
 
-- [ ] **Plan this assignment.**
-- [ ] `train.py`: load processed data → **for each condition in the registry (H49)** → split → train each model → evaluate → save `ml/models/<condition>/<name>.joblib`. `python ml/src/train.py --condition diabetes` trains one; no flag trains all.
-- [ ] `ml/models/<condition>/metrics.json`: per-model metrics, plus `best_model` and selection criterion; a top-level `ml/models/index.json` lists every trained condition.
-- [ ] `ml/models/<condition>/model_meta.json`: condition, data source, row counts, feature list (canonical order, **after the registry's exclusions**), seed, library versions, git SHA, timestamp. The backend validates requests against this feature list.
-- [ ] Smoke test: `train.py` runs end-to-end on a 300-row synthetic dataset in CI (< 30 s) and writes valid JSON.
-- [ ] **Write the assignment doc** → `docs/assignments/H13-train.md`.
+- [x] **Plan this assignment.** _(Best model chosen on validation ROC-AUC, near-ties to logreg; run as `python -m ml.src.train`; see H13 doc.)_
+- [x] `train.py`: load processed data → **for each condition in the registry (H49)** → split → train each model → evaluate → save `ml/models/<condition>/<name>.joblib`. `python ml/src/train.py --condition diabetes` trains one; no flag trains all.
+- [x] `ml/models/<condition>/metrics.json`: per-model metrics, plus `best_model` and selection criterion; a top-level `ml/models/index.json` lists every trained condition.
+- [x] `ml/models/<condition>/model_meta.json`: condition, data source, row counts, feature list (canonical order, **after the registry's exclusions**), seed, library versions, git SHA, timestamp. The backend validates requests against this feature list.
+- [x] Smoke test: `train.py` runs end-to-end on a 300-row synthetic dataset in CI (< 30 s) and writes valid JSON.
+- [x] **Write the assignment doc** → `docs/assignments/H13-train.md`.
 
 **Acceptance Criteria:**
 
@@ -724,12 +724,12 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Goal:** Global importance plot + per-prediction explanations, in a form the API can reuse.
 **Depends on:** H13
 
-- [ ] **Plan this assignment.**
-- [ ] `explain.py --condition <name>`: load that condition's XGBoost → `shap.TreeExplainer` → global summary (beeswarm) + bar plot saved to `docs/figures/<condition>/`.
-- [ ] `explain_one(row) -> list[{feature, value, contribution}]` sorted by absolute contribution. **This exact function is what `/predict` calls.**
-- [ ] Map one-hot/encoded columns **back to canonical feature names** so explanations read "BMI", not `num__bmi`.
-- [ ] Sanity test: base value + sum of contributions ≈ model margin output for a sample row.
-- [ ] **Write the assignment doc** → `docs/assignments/H14-shap.md`.
+- [x] **Plan this assignment.** _(Pivot: explains the condition's best model, logreg or XGBoost; native TreeSHAP / exact linear SHAP so the backend needs no `shap`; train.py saves explainer.joblib. See H14 doc.)_
+- [x] `explain.py --condition <name>`: load that condition's XGBoost → `shap.TreeExplainer` → global summary (beeswarm) + bar plot saved to `docs/figures/<condition>/`.
+- [x] `explain_one(row) -> list[{feature, value, contribution}]` sorted by absolute contribution. **This exact function is what `/predict` calls.**
+- [x] Map one-hot/encoded columns **back to canonical feature names** so explanations read "BMI", not `num__bmi`.
+- [x] Sanity test: base value + sum of contributions ≈ model margin output for a sample row.
+- [x] **Write the assignment doc** → `docs/assignments/H14-shap.md`.
 
 ---
 
@@ -738,12 +738,12 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Goal:** Know where the model is weaker and say so plainly.
 **Depends on:** H13, H14
 
-- [ ] **Plan this assignment.**
-- [ ] Metrics by `sex`, `age_band`, `income_band` (recall, PR-AUC, calibration per group), **for the three Tier 1 conditions**. Tier 2 conditions get overall metrics and a generated card (H49).
-- [ ] Calibration plot for LR vs XGBoost.
-- [ ] `docs/model-cards/<condition>.md` for each Tier 1 condition: intended use, not-intended use, data, metrics, subgroup results, limitations (self-reported, cross-sectional, US BRFSS ≠ Canadian population unless CCHS lands). Tier 2 cards are generated from `metrics.json` plus the registry's text.
-- [ ] Plain-language limitations text that the frontend will show (H25).
-- [ ] **Write the assignment doc** → `docs/assignments/H15-model-card.md`.
+- [x] **Plan this assignment.** _(Cards generated from model files, wording in the generator; weak subgroups become limitation sentences automatically. See H15 doc.)_
+- [x] Metrics by `sex`, `age_band`, `income_band` (recall, PR-AUC, calibration per group), **for the three Tier 1 conditions**. Tier 2 conditions get overall metrics and a generated card (H49).
+- [x] Calibration plot for LR vs XGBoost.
+- [x] `docs/model-cards/<condition>.md` for each Tier 1 condition: intended use, not-intended use, data, metrics, subgroup results, limitations (self-reported, cross-sectional, US BRFSS ≠ Canadian population unless CCHS lands). Tier 2 cards are generated from `metrics.json` plus the registry's text.
+- [x] Plain-language limitations text that the frontend will show (H25).
+- [x] **Write the assignment doc** → `docs/assignments/H15-model-card.md`.
 
 ---
 
@@ -753,14 +753,14 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Why it matters:** This is the decision that makes "many diseases" affordable. Without it, each new condition costs a copy-pasted pipeline and a pile of `if condition == …`.
 **Depends on:** H07, H09
 
-- [ ] **Plan this assignment.** Agree the Tier 1 and Tier 2 lists (§5.4) as a team, and the registry's fields.
-- [ ] `ml/src/conditions.yaml` (or `.json`): per condition: `id`, `display_name`, `body_system`, `tier`, `outcome_column` (canonical name), `exclude_features` (the outcome itself plus anything that defines it, e.g. `high_bp` for hypertension), `sensitive` (true for depression), patient-facing and clinician-facing wording, and a short plain-language "what this is".
-- [ ] `ml/src/registry.py`: loads and **validates** the file (every `outcome_column` exists in the canonical schema; no condition lists its own outcome as a feature; ids are unique). Fails loudly with a clear message.
-- [ ] Tests first: a registry that excludes nothing for hypertension is rejected; an unknown outcome column is rejected; a valid 2-condition registry loads; no module outside `registry.py` hard-codes a disease name (enforce with a grep test, like H07).
-- [ ] Generalise `train.py`, `explain.py`, `evaluate.py` to take `--condition` (H13/H14 reference this).
-- [ ] **Auto-generated model card** for each condition from `metrics.json` and the registry text (the Tier 2 path; Tier 1 cards are then hand-edited in H15).
-- [ ] Start with **diabetes only** in the registry and get it green end-to-end, then add hypertension and heart disease, then the Tier 2 six. If a condition's data can't be mapped cleanly by the freeze, leave it out.
-- [ ] **Write the assignment doc** → `docs/assignments/H49-condition-registry.md`.
+- [x] **Plan this assignment.** _(Team agreed nine conditions, ADR-0015.)_ Agree the Tier 1 and Tier 2 lists (§5.4) as a team, and the registry's fields.
+- [x] `ml/src/conditions.yaml` _(Pivot: opt-in `comorbidity_features` instead of `exclude_features`; wording = display_name + description + optional patient_name from H46.)_ (or `.json`): per condition: `id`, `display_name`, `body_system`, `tier`, `outcome_column` (canonical name), `exclude_features` (the outcome itself plus anything that defines it, e.g. `high_bp` for hypertension), `sensitive` (true for depression), patient-facing and clinician-facing wording, and a short plain-language "what this is".
+- [x] `ml/src/registry.py`: loads and **validates** the file (every `outcome_column` exists in the canonical schema; no condition lists its own outcome as a feature; ids are unique). Fails loudly with a clear message.
+- [x] Tests first: a registry that excludes nothing for hypertension is rejected; an unknown outcome column is rejected; a valid 2-condition registry loads; no module outside `registry.py` hard-codes a disease name (enforce with a grep test, like H07).
+- [x] Generalise `train.py`, `explain.py`, `evaluate.py` to take `--condition` (H13/H14 reference this). _(Done: evaluate.py H10, train.py H13, explain.py H14.)_
+- [x] **Auto-generated model card** for each condition from `metrics.json` and the registry text (the Tier 2 path; Tier 1 cards are then hand-edited in H15).
+- [x] _(All nine mapped together in H07.)_ Start with **diabetes only** in the registry and get it green end-to-end, then add hypertension and heart disease, then the Tier 2 six. If a condition's data can't be mapped cleanly by the freeze, leave it out.
+- [x] **Write the assignment doc** → `docs/assignments/H49-condition-registry.md`.
 
 **Acceptance Criteria:**
 
@@ -774,11 +774,11 @@ _Goal: an honest comparison of an interpretable baseline vs. gradient boosting, 
 **Why it matters:** A model with ROC-AUC 0.58 that still prints "your risk is 34%" is worse than no model. This is where we show judgement, and it's the answer to "why not predict everything?".
 **Depends on:** H13, H49
 
-- [ ] **Plan this assignment.** Agree thresholds as a team and write them in ADR-0016. Suggested starting point: held-out ROC-AUC ≥ 0.70, calibration better than the no-skill baseline (Brier), and `sensitive: false`. Revisit after seeing real numbers.
-- [ ] `ml/src/gate.py`: reads each condition's `metrics.json` and the registry, writes `prediction_enabled`, `signal_strength` (strong ≥ 0.80, moderate 0.70–0.80, weak < 0.70; adjust with the team), and the reason, into `ml/models/index.json`.
-- [ ] Tests first: a synthetic metrics file below the threshold is disabled; a sensitive condition is disabled regardless of score; reasons are human-readable.
-- [ ] The API and UI only _read_ this result (H19, H24, H25, H40); they never re-implement the rule.
-- [ ] **Write the assignment doc** → `docs/assignments/H50-release-gate.md`.
+- [x] **Plan this assignment.** _(ADR-0016 written as Proposed with the suggested thresholds; team to confirm after the real run.)_ Agree thresholds as a team and write them in ADR-0016. Suggested starting point: held-out ROC-AUC ≥ 0.70, calibration better than the no-skill baseline (Brier), and `sensitive: false`. Revisit after seeing real numbers.
+- [x] `ml/src/gate.py`: reads each condition's `metrics.json` and the registry, writes `prediction_enabled`, `signal_strength` (strong ≥ 0.80, moderate 0.70–0.80, weak < 0.70; adjust with the team), and the reason, into `ml/models/index.json`.
+- [x] Tests first: a synthetic metrics file below the threshold is disabled; a sensitive condition is disabled regardless of score; reasons are human-readable.
+- [x] The API and UI only _read_ this result (H19, H24, H25, H40); they never re-implement the rule.
+- [x] **Write the assignment doc** → `docs/assignments/H50-release-gate.md`.
 
 **Acceptance Criteria:**
 
@@ -1186,13 +1186,13 @@ _Goal: an explanation of predictions and an AI assistant, with safety built in r
 
 **Depends on:** H14, H40
 
-- [ ] **Plan this assignment.**
-- [ ] **Deterministic first:** turn the SHAP contributions into readable sentences from templates ("Your BMI is the biggest factor raising this estimate; being physically active lowers it."). Tested with golden examples, no AI required.
-- [ ] Two reading levels: clinician and patient.
-- [ ] Condition-specific wording comes from the registry (H49), so a new condition needs no new code; sensitive conditions get softer, non-alarming wording.
-- [ ] Optional: LLM rewording behind H45, with a check that the rewording doesn't add or remove any factor.
-- [ ] Never states a diagnosis; always links the limitations.
-- [ ] **Write the assignment doc** → `docs/assignments/H46-explanations.md`.
+- [x] **Plan this assignment.** _(Template layer built on H14 only; registry gains optional `patient_name`; AI rewording left for when H45 exists. See H46 doc.)_
+- [x] **Deterministic first:** turn the SHAP contributions into readable sentences from templates ("Your BMI is the biggest factor raising this estimate; being physically active lowers it."). Tested with golden examples, no AI required.
+- [x] Two reading levels: clinician and patient.
+- [x] Condition-specific wording comes from the registry (H49), so a new condition needs no new code; sensitive conditions get softer, non-alarming wording.
+- [ ] Optional: LLM rewording behind H45 _(not done: H45 not built yet; `describe()` returns a `factors` list to check against)_, with a check that the rewording doesn't add or remove any factor.
+- [x] Never states a diagnosis; always links the limitations.
+- [x] **Write the assignment doc** → `docs/assignments/H46-explanations.md`.
 
 ---
 
