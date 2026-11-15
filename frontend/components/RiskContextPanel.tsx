@@ -16,6 +16,52 @@ interface RiskContextPanelProps {
   mode: RecordMode;
 }
 
+/** Survey answers are stored as band numbers; show the band a reader would recognise. */
+const AGE_BANDS = [
+  "18-24", "25-29", "30-34", "35-39", "40-44", "45-49", "50-54",
+  "55-59", "60-64", "65-69", "70-74", "75-79", "80 or older",
+];
+const INCOME_BANDS = [
+  "under $15k", "$15k-$25k", "$25k-$35k", "$35k-$50k",
+  "$50k-$100k", "$100k-$200k", "$200k or more",
+];
+const EDUCATION_BANDS = [
+  "did not finish high school", "high school graduate",
+  "some college or technical school", "college graduate",
+];
+const GENERAL_HEALTH = ["excellent", "very good", "good", "fair", "poor"];
+
+function band(labels: string[], value: number): string {
+  const index = Math.round(value) - 1;
+  return labels[index] ?? String(value);
+}
+
+/** Turn a raw model input into something a patient or clinician can read. */
+function featureValue(feature: string, value: string | number): string {
+  if (typeof value === "number") {
+    switch (feature) {
+      case "age_band":
+        return band(AGE_BANDS, value);
+      case "income_band":
+        return band(INCOME_BANDS, value);
+      case "education_band":
+        return band(EDUCATION_BANDS, value);
+      case "gen_health":
+        return band(GENERAL_HEALTH, value);
+      case "risk_factor_count":
+      case "lifestyle_score":
+        return `${Math.round(value)} of 5`;
+      case "bmi":
+        return value.toFixed(1);
+      default:
+        return String(value);
+    }
+  }
+  if (value === "True" || value === "1.0") return "yes";
+  if (value === "False" || value === "0.0") return "no";
+  return value;
+}
+
 function Contributions({ items }: { items: RiskContribution[] }) {
   const max = Math.max(...items.map((item) => Math.abs(item.contribution)), 0.0001);
   return (
@@ -26,9 +72,9 @@ function Contributions({ items }: { items: RiskContribution[] }) {
         return (
           <div className="shap" key={`${item.feature}-${item.contribution}`}>
             <span>
-              {humanise(item.feature)}{" "}
+              {item.label ?? humanise(item.feature)}{" "}
               {item.value !== undefined && item.value !== null && (
-                <span className="muted small">{String(item.value)}</span>
+                <span className="muted small">{featureValue(item.feature, item.value)}</span>
               )}
             </span>
             <div className="t">
@@ -80,6 +126,12 @@ export function RiskContextPanel({
     [patientId, conditionId, skipFetch],
   );
   const risk = useResource(load);
+
+  // The API returns both reading levels; show the one that matches who is looking.
+  const explanationText =
+    mode === "patient" ? risk.data?.explanation?.patient?.text : risk.data?.explanation?.clinician?.text;
+  // Only shown when the survey file is present, so the comparison group is real.
+  const likeThis = risk.data?.patients_like_this ?? null;
 
   const limits = (
     <div className="alert small">
@@ -166,29 +218,24 @@ export function RiskContextPanel({
                 </div>
                 <div className="kpi">
                   <span className="v" style={{ fontSize: 40 }}>
-                    {risk.data.probability === undefined
-                      ? "—"
-                      : pct(clamp01(risk.data.probability), 0)}
+                    {risk.data.risk === undefined ? "—" : pct(clamp01(risk.data.risk), 0)}
                   </span>
                 </div>
-                {risk.data.probability !== undefined && (
+                {risk.data.risk !== undefined && (
                   <>
                     <div className="meter" style={{ margin: "12px 0 6px" }}>
-                      <div
-                        className="f"
-                        style={{ width: `${clamp01(risk.data.probability) * 100}%` }}
-                      />
-                      {risk.data.baseline !== undefined && (
+                      <div className="f" style={{ width: `${clamp01(risk.data.risk) * 100}%` }} />
+                      {likeThis && (
                         <div
                           className="tick"
-                          style={{ left: `${clamp01(risk.data.baseline) * 100}%` }}
-                          title="Typical adult"
+                          style={{ left: `${clamp01(likeThis.rate) * 100}%` }}
+                          title="People in the same age and BMI band"
                         />
                       )}
                     </div>
-                    {risk.data.baseline !== undefined && (
+                    {risk.data.risk_band && (
                       <p className="small muted">
-                        Black tick: a typical adult ({pct(clamp01(risk.data.baseline), 0)}).
+                        Described as <strong>{risk.data.risk_band}</strong> for this condition.
                       </p>
                     )}
                   </>
@@ -208,10 +255,22 @@ export function RiskContextPanel({
             </div>
           )}
 
-          {risk.data?.explanation && (
+          {likeThis && (
+            <div className="card flat">
+              <h3>{mode === "patient" ? "People like you" : "Patients like this"}</h3>
+              <p className="small" style={{ marginTop: 4 }}>
+                About <strong>{pct(clamp01(likeThis.rate), 1)}</strong> of survey respondents aged{" "}
+                {likeThis.age_band} with a BMI of {likeThis.bmi_band} report{" "}
+                {(risk.data?.display_name ?? "this condition").toLowerCase()}{" "}
+                <span className="muted">(n = {likeThis.n.toLocaleString("en-US")})</span>.
+              </p>
+            </div>
+          )}
+
+          {explanationText && (
             <div className="card">
               <h3>{mode === "patient" ? "In plain words" : "Plain-language summary"}</h3>
-              <p style={{ marginTop: 6 }}>{risk.data.explanation}</p>
+              <p style={{ marginTop: 6 }}>{explanationText}</p>
             </div>
           )}
         </>
