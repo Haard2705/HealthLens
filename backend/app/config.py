@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     demo_password: str = ""
     session_minutes: int = 60
     cors_origins: str = "http://localhost:3000"
+    # Empty = run entirely in memory (the default: a clone needs no database).
+    database_url: str = ""
     model_dir: Path = Path("ml/models")
     processed_data_path: Path = Path("data/processed/brfss_clean.parquet")
 
