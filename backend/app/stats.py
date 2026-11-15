@@ -19,6 +19,10 @@ AGE_BAND_LABELS = {  # BRFSS 13-level age category
     1: "18-24", 2: "25-29", 3: "30-34", 4: "35-39", 5: "40-44", 6: "45-49", 7: "50-54",
     8: "55-59", 9: "60-64", 10: "65-69", 11: "70-74", 12: "75-79", 13: "80+",
 }  # fmt: skip
+INCOME_BAND_LABELS = {  # canonical income_band, 1-7 (H07)
+    1: "under $15k", 2: "$15k-$25k", 3: "$25k-$35k", 4: "$35k-$50k", 5: "$50k-$100k",
+    6: "$100k-$200k", 7: "$200k or more",
+}  # fmt: skip
 
 
 def _bmi_band(df: pd.DataFrame) -> pd.Series:
@@ -33,6 +37,7 @@ def _label_column(column: str, mapping: dict[Any, str]) -> Callable[[pd.DataFram
 GROUPERS: dict[str, tuple[str, Callable[[pd.DataFrame], pd.Series]]] = {
     "age_band": ("age_band", _label_column("age_band", AGE_BAND_LABELS)),
     "bmi_band": ("bmi", _bmi_band),
+    "income_band": ("income_band", _label_column("income_band", INCOME_BAND_LABELS)),
     "phys_active": (
         "phys_active",
         _label_column("phys_active", {True: "active", False: "inactive"}),
@@ -45,6 +50,7 @@ BY_OPTIONS = tuple(GROUPERS)
 SAMPLE_GROUPS = {
     "age_band": ("18-34", "35-49", "50-64", "65+"),
     "bmi_band": BMI_LABELS,
+    "income_band": tuple(INCOME_BAND_LABELS.values()),
     "phys_active": ("active", "inactive"),
     "sex": ("female", "male"),
 }

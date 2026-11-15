@@ -99,6 +99,7 @@ def _survey_frame() -> pd.DataFrame:
             "sex": sex,
             "age_band": rng.integers(1, 14, n),
             "bmi": rng.uniform(17, 40, n),
+            "income_band": rng.integers(1, 8, n),
             "phys_active": rng.random(n) > 0.5,
             "diabetes": (sex == "male") & (np.arange(n) % 4 == 0),
         }
