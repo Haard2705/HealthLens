@@ -105,10 +105,12 @@ def system(access: SystemAdmin) -> dict:
     models = state.settings.models_path
     return {
         "data_source": state.repo.source,
+        "storage": state.storage,
         "patient_count": len(state.repo.list_all()),
         "user_count": len(state.users.all()),
         "conditions_total": len(state.registry.ids),
         "conditions_prediction_enabled": catalog.prediction_enabled_count(state.registry, models),
         "environment": state.settings.env,
         "demo_domain": DEMO_DOMAIN,
+        "models_loaded": list(state.models.condition_ids),
     }

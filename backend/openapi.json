@@ -229,6 +229,105 @@
         }
       }
     },
+    "/api/v1/predict": {
+      "post": {
+        "tags": [
+          "predict"
+        ],
+        "summary": "Create Prediction",
+        "description": "An estimate for one set of answers. 409 when the release gate blocks the condition.",
+        "operationId": "create_prediction_api_v1_predict_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Create Prediction Api V1 Predict Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/patients/{patient_id}/risk-context": {
+      "get": {
+        "tags": [
+          "predict"
+        ],
+        "summary": "Patient Risk Context",
+        "description": "The same estimate, built from a patient's record, plus how people like them compare.\n\nScoping is the usual one (``Access.patient``): a patient sees only their own record, a\ndoctor only assigned patients, an admin any record but always audit-logged. A record the\ncaller may not see answers with the same 404 as one that does not exist.",
+        "operationId": "patient_risk_context_api_v1_patients__patient_id__risk_context_get",
+        "parameters": [
+          {
+            "name": "patient_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Patient Id"
+            }
+          },
+          {
+            "name": "condition",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 40,
+              "title": "Condition"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Patient Risk Context Api V1 Patients  Patient Id  Risk Context Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/doctor/patients": {
       "get": {
         "tags": [
@@ -947,6 +1046,23 @@
           "general_health"
         ],
         "title": "PatientRecord"
+      },
+      "PredictRequest": {
+        "properties": {
+          "condition": {
+            "type": "string",
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Condition"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "condition"
+        ],
+        "title": "PredictRequest",
+        "description": "``{\"condition\": \"diabetes\", ...answers}``. The answers are validated per condition\nagainst that model's own ``feature_spec``, so they cannot be declared statically here."
       },
       "Role": {
         "type": "string",

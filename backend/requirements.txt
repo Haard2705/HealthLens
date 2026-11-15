@@ -7,5 +7,8 @@ PyJWT>=2.9
 pandas>=3.1.1
 pyarrow>=26.0.1
 PyYAML>=6.0
-# Only needed by the P2 /predict endpoint (ml/models artifacts); imported lazily.
+# Loading the trained pipelines for /predict (H19). The backend never trains; `shap` is
+# deliberately absent, because the saved explainer computes contributions itself.
 joblib>=1.6.0
+scikit-learn>=1.5
+xgboost>=2.1
