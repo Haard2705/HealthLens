@@ -1,0 +1,1 @@
+"""HealthLens backend (FastAPI)."""
