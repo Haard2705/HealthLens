@@ -1,90 +1,120 @@
-# H12 — XGBoost
+# H12 — Random forest and XGBoost
 
 ## What we built (plain English)
 
-`ml/src/boosting.py` trains XGBoost for each condition. XGBoost builds hundreds of small
-decision trees, each fixing the mistakes of the ones before. Unlike logistic regression it
-can learn patterns like "risk is high when one factor is high but not both". It goes
-through exactly the same H10 harness as the H11 baseline (same split, same validation
-rows, same scoring), so the comparison is fair. `--compare` prints both side by side.
+Two non-linear models, so the report can put **three** models side by side for every
+condition (FR3), all through the same H10 harness as the H11 baseline:
 
-Steps per condition:
+- `ml/src/forest.py` — a **random forest**. It grows a few hundred independent decision
+  trees; each tree sees a bootstrap sample of the rows and a random subset of the factors at
+  every split, and the forest averages their votes. That averaging is what makes it stable:
+  unlike a single deep tree it doesn't memorise the training rows.
+- `ml/src/boosting.py` — **XGBoost**. It builds hundreds of small trees in sequence, each one
+  correcting the mistakes of the ones before. Usually the strongest of the three, and the
+  hardest to explain (H14 adds SHAP for that).
+
+Both can learn patterns a linear model can't, such as "risk is high when one factor is high
+but not both". Both use the same split, the same validation rows and the same scoring as the
+baseline, so the comparison is fair. `--compare` on either CLI prints it against the baseline;
+`python -m ml.src.train` (H13) trains all three and writes the comparison into `metrics.json`.
+
+Steps per condition, identical for both models except where noted:
 
 1. H10 split → train / test (test untouched until the end).
 2. Training rows → *fit* part (80%) and *validation* part (20%), the same rows as H11.
-3. **Randomized search**: 12 random combinations of six settings (tree depth, learning
-   rate, min child weight, row/column sampling, L2 penalty), scored by 3-fold ROC-AUC on the
-   fit part. If the fit part has more than 100,000 rows, the search uses a stratified
-   100,000-row sample to stay quick.
-4. **Early stopping**: refit the winning settings on the whole fit part, adding trees (up to
-   2,000) until validation log-loss hasn't improved for 50 rounds.
+3. **Randomized search** on the fit part, scored by k-fold ROC-AUC, on a stratified sample of
+   it when it is large:
+   - forest: 6 candidates × 3 folds over tree depth, leaf size and features-per-split, with
+     120-tree search forests, on at most 40,000 rows.
+   - XGBoost: 12 candidates × 3 folds over six settings (depth, learning rate, min child
+     weight, row/column sampling, L2 penalty) with 300 trees, on at most 100,000 rows.
+4. **Final fit** on the whole fit part: the forest refits the winning settings with 300 trees;
+   XGBoost refits with **early stopping**, adding trees (up to 2,000) until validation
+   log-loss hasn't improved for 50 rounds.
 5. Recall-oriented threshold chosen on validation; final metrics on test.
 
 ## Key decisions
 
-- **`scale_pos_weight = 1` (deviation from the roadmap), same reasoning as H11.** Weighting
-  the rare class inflates every predicted probability; the recall-oriented threshold handles
-  imbalance instead. A CI test asserts the trained model's Brier score beats the no-skill
-  baseline.
-- **Modest tuning, on purpose** ("don't burn a week on 0.002 AUC"): 12 candidates × 3 folds
-  with 300 trees each, then one early-stopped fit.
-- **No early stopping inside cross-validation**: each fold would need its own validation set.
-  Early stopping happens once, in the final fit.
+- **No class weighting in either model** (deviation from the roadmap), same reasoning as H11.
+  Weighting the rare class leaves the ranking (ROC-AUC) alone but inflates every predicted
+  probability, so a 15% risk can read as 40% and the Brier score falls below the no-skill
+  baseline. The recall-oriented threshold from H10 handles the imbalance instead. A CI test
+  per model asserts the trained model's Brier score still beats no-skill.
+- **The forest's depth and leaf size are capped** (`max_depth` 6/10/14, `min_samples_leaf`
+  5/20/50). Fully grown trees on ~285,000 fit rows are slow, enormous in memory, and no more
+  accurate once leaves are this size. `n_jobs=-1` keeps the fit parallel.
+- **Modest tuning, on purpose** ("don't burn a week on 0.002 AUC"). The forest searches a
+  smaller space than XGBoost because it has fewer knobs that matter: depth, leaf size and
+  how many factors each split may look at.
+- **No early stopping inside cross-validation** (XGBoost): each fold would need its own
+  validation set. Early stopping happens once, in the final fit. The forest needs none —
+  more trees never make it worse, they just cost time.
 - **The validation set does two jobs** (early stopping and choosing the threshold). It is
   never the test set, so the test metrics stay honest; the threshold may be very slightly
   optimistic on validation itself, which we accept.
 - The preprocessor is fit on the fit part only and then applied to the validation rows, so
-  early stopping doesn't leak validation information into fill values or scaling.
-- **LightGBM (optional in the roadmap) is not included.** It's a stretch item; the harness
-  makes adding it later a one-file change.
+  neither model leaks validation information into fill values or scaling.
+- **Explanations (H14):** the forest averages probabilities rather than log-odds, so its SHAP
+  contributions are in probability units and the explanation payload says so. Logistic
+  regression and XGBoost stay in log-odds.
+- **LightGBM (optional in the roadmap) is not included.** It's a stretch item; with two tree
+  models in place the harness makes adding a third a one-file change.
 
 ## How it works
 
 | Function | Purpose |
 |---|---|
-| `build_xgb(predictors, **params)` | H09 preprocessor → `XGBClassifier` (hist trees, seed 42) |
-| `tune_xgb(x, y, predictors)` | `RandomizedSearchCV` over `PARAM_SPACE`; returns best settings + CV ROC-AUC |
-| `fit_with_early_stopping(predictors, params, fit, val)` | final fit; returns pipeline + number of trees kept |
-| `train_xgb(split)` → `BoostResult` | steps 2–5; `.summary()` has the same shape as H11's for `metrics.json` (H13) |
-| `compare([summaries])` | side-by-side table (ROC-AUC, PR-AUC, Brier, recall, precision, threshold) |
-| `python -m ml.src.boosting [--condition ID] [--compare]` | train and print |
+| `forest.build_forest(predictors, **params)` | H09 preprocessor → `RandomForestClassifier` (seed 42, `n_jobs=-1`) |
+| `forest.tune_forest(x, y, predictors)` | `RandomizedSearchCV` over `PARAM_SPACE`; returns best settings + CV ROC-AUC |
+| `forest.fit_forest(predictors, params, fit)` | final 300-tree fit on the fit part only |
+| `forest.train_forest(split)` → `ForestResult` | steps 2–5; `.summary()` has the H11 shape for `metrics.json` (H13) |
+| `boosting.build_xgb(predictors, **params)` | H09 preprocessor → `XGBClassifier` (hist trees, seed 42) |
+| `boosting.tune_xgb(x, y, predictors)` | `RandomizedSearchCV` over `PARAM_SPACE`; returns best settings + CV ROC-AUC |
+| `boosting.fit_with_early_stopping(predictors, params, fit, val)` | final fit; returns pipeline + number of trees kept |
+| `boosting.train_xgb(split)` → `BoostResult` | steps 2–5; same `.summary()` shape |
+| `boosting.compare([summaries])` | side-by-side table (ROC-AUC, PR-AUC, Brier, recall, precision, threshold), used by both CLIs |
+| `python -m ml.src.forest [--condition ID] [--compare]` | train the forest and print |
+| `python -m ml.src.boosting [--condition ID] [--compare]` | train XGBoost and print |
+
+H13's `MODEL_ORDER` is `("logreg", "random_forest", "xgboost")` — simplest first, because on a
+near-tie (validation ROC-AUC within 0.005) `select_best` keeps the simpler model.
 
 ## How to run / verify it
 
 ```bash
-python -m pytest ml/tests/test_boosting.py
-python -m ml.src.boosting --condition diabetes --compare   # needs the processed BRFSS file
+python -m pytest ml/tests/test_forest.py ml/tests/test_boosting.py
+python -m ml.src.forest --condition diabetes --compare     # needs the processed BRFSS file
+python -m ml.src.train                                     # all three models, all conditions
 ```
 
-14 tests: pipeline shape, search space, sampling, early stopping, same rows as the baseline,
-learns a planted signal and stays calibrated, beats the linear model on an interaction,
-JSON-safe summary in the baseline's shape, reproducibility, comparison table, CLI. The tests
-skip themselves where `xgboost` isn't installed; CI installs it from `ml/requirements.txt`.
+16 tests for the forest and 14 for XGBoost: pipeline shape, no class weighting, search space,
+sampling, tree count / early stopping, same rows as the baseline, learns a planted signal and
+stays calibrated, beats the linear model on a planted interaction, JSON-safe summary with the
+baseline's metric keys, reproducibility, reload-and-predict, comparison table, CLI. The
+XGBoost tests skip themselves where `xgboost` isn't installed; the forest's need only
+scikit-learn. H13's smoke test trains nine conditions × three models on 300 synthetic rows in
+about 29 seconds.
 
 ## Results
 
-Synthetic checks (20,000 rows; not reported results). These were run with a scikit-learn
-gradient-boosting stand-in because the development sandbox couldn't install `xgboost`; CI
-runs the same tests with the real library.
+Synthetic checks (4,000 rows; not reported results): where risk simply rises with BMI and age,
+all three models land within a few thousandths of each other; where risk is high when exactly
+one of BMI / age is high, both tree models beat the linear baseline by more than 0.10 ROC-AUC.
 
-| Planted pattern | Model | ROC-AUC | PR-AUC | Brier | Recall @ chosen cut-off |
-|---|---|---|---|---|---|
-| Risk rises with BMI + age (additive) | logreg | 0.706 | 0.367 | 0.145 | 0.82 |
-| | xgboost | 0.704 | 0.367 | 0.145 | 0.82 |
-| Risk high when exactly one of BMI / age is high | logreg | 0.530 | 0.266 | 0.197 | 0.85 |
-| | xgboost | **0.785** | **0.497** | **0.148** | 0.80 |
+### Real BRFSS 2025 results — all three models, all nine conditions
 
-Takeaway for the report: when risk factors simply add up, the linear baseline is as good
-as XGBoost (and easier to explain); XGBoost only wins when there are real interactions.
-Whether BRFSS has enough of those is what the real comparison will show.
+Test-set ROC-AUC (356,000 rows; the chosen model is the one `train.py` saved as best, by
+**validation** ROC-AUC with the 0.005 tie margin). "Estimates" is the H50 release-gate
+decision for individual estimates.
 
-Real BRFSS results: run `python -m ml.src.boosting --compare` on the processed 2025 file
-and paste the tables (all nine conditions) here.
+<!-- RESULTS TABLE -->
 
 ## Gotchas / follow-ups
 
-- Training all nine conditions on the full file takes a while (minutes per condition);
-  `--n-iter 4` is a quick check.
-- Builds on H11 (PR #13) → H10 (PR #12) → H09 (PR #11); merge in that order.
-- H13 (`train.py`) will call `train_logreg` and `train_xgb`, save both models, and pick the
-  best by validation ROC-AUC.
+- Training all nine conditions on the full file takes tens of minutes; `--fast` (or
+  `--n-iter 4` on the single-model CLIs) is the quick check.
+- The forest is the slowest model to *save*: a 300-tree forest is a far bigger joblib file
+  than the baseline or XGBoost. `ml/models/` is gitignored, so this only costs local disk.
+- Builds on H11 → H10 → H09.
+- H13 (`train.py`) calls all three trainers, saves all three models, and picks the best by
+  validation ROC-AUC.

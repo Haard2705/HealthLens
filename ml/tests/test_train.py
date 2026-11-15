@@ -43,13 +43,28 @@ def trained(tmp_path_factory, frame):
 
 
 def test_select_best_takes_the_highest_validation_auc() -> None:
-    assert train.select_best({"logreg": 0.70, "xgboost": 0.75}) == "xgboost"
-    assert train.select_best({"logreg": 0.80, "xgboost": 0.75}) == "logreg"
+    assert train.select_best({"logreg": 0.70, "random_forest": 0.72, "xgboost": 0.75}) == "xgboost"
+    assert train.select_best({"logreg": 0.80, "random_forest": 0.72, "xgboost": 0.75}) == "logreg"
+    assert (
+        train.select_best({"logreg": 0.70, "random_forest": 0.78, "xgboost": 0.75})
+        == "random_forest"
+    )
 
 
 def test_select_best_prefers_the_simpler_model_on_a_near_tie() -> None:
     assert train.select_best({"logreg": 0.750, "xgboost": 0.754}) == "logreg"
     assert train.select_best({"xgboost": 0.754, "logreg": 0.750}) == "logreg"
+    # Three-way near-tie: the simplest of the tied models wins, whatever the dict order.
+    tie = {"xgboost": 0.754, "random_forest": 0.753, "logreg": 0.750}
+    assert train.select_best(tie) == "logreg"
+    assert train.select_best({k: v for k, v in tie.items() if k != "logreg"}) == "random_forest"
+    # A clear win is still a win: the simpler model only gets it inside the tie margin.
+    assert train.select_best({"logreg": 0.750, "random_forest": 0.790}) == "random_forest"
+
+
+def test_model_order_lists_the_models_simplest_first() -> None:
+    assert train.MODEL_ORDER == ("logreg", "random_forest", "xgboost")
+    assert "logreg, then random_forest, then xgboost" in train.SELECTION_CRITERION
 
 
 def test_select_best_needs_models() -> None:
@@ -129,7 +144,7 @@ def test_index_entry_summarises_the_condition(trained) -> None:
 
 def test_unknown_model_name_is_rejected(tmp_path, frame) -> None:
     with pytest.raises(ValueError, match="unknown model"):
-        train.train_condition(frame, FIRST, tmp_path, ("forest",), FAST)
+        train.train_condition(frame, FIRST, tmp_path, ("decision_tree",), FAST)
 
 
 # ---- index.json -----------------------------------------------------------------------
@@ -179,11 +194,11 @@ def test_main_unknown_condition(monkeypatch, capsys) -> None:
     assert "unknown condition" in capsys.readouterr().err
 
 
-# ---- the roadmap's smoke test: every condition, both models, 300 rows ---------------------
+# ---- the roadmap's smoke test: every condition, every model, 300 rows ---------------------
 
 
 @pytest.mark.slow
-def test_smoke_every_condition_both_models_300_rows(monkeypatch, tmp_path) -> None:
+def test_smoke_every_condition_every_model_300_rows(monkeypatch, tmp_path) -> None:
     pytest.importorskip("xgboost")
     monkeypatch.setattr(evaluate, "load_processed", lambda path: signal_frame(n=300))
     start = time.perf_counter()
@@ -196,13 +211,14 @@ def test_smoke_every_condition_both_models_300_rows(monkeypatch, tmp_path) -> No
         folder = tmp_path / condition_id
         assert {
             "logreg.joblib",
+            "random_forest.joblib",
             "xgboost.joblib",
             "metrics.json",
             "model_meta.json",
             "explainer.joblib",
         } <= {p.name for p in folder.iterdir()}
         metrics = strict_json(folder / "metrics.json")
-        assert set(metrics["models"]) == {"logreg", "xgboost"}
-        assert metrics["best_model"] in {"logreg", "xgboost"}
-    print(f"smoke test trained {len(index)} conditions x 2 models in {elapsed:.1f}s")
+        assert set(metrics["models"]) == set(train.MODEL_ORDER)
+        assert metrics["best_model"] in set(train.MODEL_ORDER)
+    print(f"smoke test trained {len(index)} conditions x 3 models in {elapsed:.1f}s")
     assert elapsed < 120  # roadmap target is < 30 s in CI; this bound only catches runaways
