@@ -221,4 +221,6 @@ def test_smoke_every_condition_every_model_300_rows(monkeypatch, tmp_path) -> No
         assert set(metrics["models"]) == set(train.MODEL_ORDER)
         assert metrics["best_model"] in set(train.MODEL_ORDER)
     print(f"smoke test trained {len(index)} conditions x 3 models in {elapsed:.1f}s")
-    assert elapsed < 120  # roadmap target is < 30 s in CI; this bound only catches runaways
+    # About 30 s on its own; several times that under coverage tracing, which is how CI runs
+    # it. The bound is deliberately loose: it only catches runaways.
+    assert elapsed < 300
