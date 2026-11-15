@@ -12,3 +12,6 @@ PyYAML>=6.0
 joblib>=1.6.0
 scikit-learn>=1.5
 xgboost>=2.1
+# Postgres (H17). Only imported when DATABASE_URL is set; the default demo needs no database.
+SQLAlchemy>=2.0
+psycopg[binary]>=3.2
