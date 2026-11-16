@@ -107,14 +107,42 @@ Test-set ROC-AUC (356,000 rows; the chosen model is the one `train.py` saved as 
 **validation** ROC-AUC with the 0.005 tie margin). "Estimates" is the H50 release-gate
 decision for individual estimates.
 
-<!-- RESULTS TABLE -->
+Command: `python -m ml.src.train` (full search, no `--fast`), 38 min 39 s wall clock on a
+16-thread laptop, then `python -m ml.src.gate`.
+
+| Condition | logreg | random forest | XGBoost | Chosen | Individual estimates |
+|---|---|---|---|---|---|
+| diabetes | 0.794 | 0.799 | **0.803** | random_forest | enabled (moderate) |
+| hypertension | 0.790 | 0.791 | **0.795** | logreg | enabled (moderate) |
+| heart_disease | 0.826 | 0.822 | **0.828** | logreg | enabled (strong) |
+| stroke | 0.783 | 0.782 | **0.787** | logreg | enabled (moderate) |
+| asthma | 0.653 | 0.651 | **0.661** | xgboost | blocked — weak signal (< 0.70) |
+| copd | 0.836 | 0.832 | **0.840** | logreg | enabled (strong) |
+| arthritis | 0.788 | 0.788 | **0.792** | logreg | enabled (moderate) |
+| kidney_disease | 0.788 | 0.782 | **0.791** | logreg | enabled (moderate) |
+| depression | 0.728 | 0.728 | **0.736** | xgboost | blocked — sensitive condition |
+
+Takeaway for the report: on BRFSS the three models are within about 0.005 ROC-AUC of each
+other everywhere. XGBoost is nominally top on every condition, but by so little that the tie
+rule hands most conditions to the baseline — and the baseline is the one we can explain with
+odds ratios. The random forest sits between the two and wins outright nowhere; it is chosen
+for diabetes only because it falls inside the tie margin of XGBoost while logistic regression
+does not. BRFSS self-reported answers simply do not carry the strong interactions that tree
+models exist to find, which is itself a finding worth reporting.
+
+The ranking of the models is the same at the recall-oriented operating point; the release-gate
+decisions are unchanged from the earlier two-model run, and `diabetes` is the only condition
+whose chosen model changed (xgboost → random_forest, 0.803 → 0.799 test ROC-AUC).
 
 ## Gotchas / follow-ups
 
-- Training all nine conditions on the full file takes tens of minutes; `--fast` (or
-  `--n-iter 4` on the single-model CLIs) is the quick check.
-- The forest is the slowest model to *save*: a 300-tree forest is a far bigger joblib file
-  than the baseline or XGBoost. `ml/models/` is gitignored, so this only costs local disk.
+- Training all nine conditions on the full file takes about 40 minutes (roughly 4 minutes per
+  condition for all three models); `--fast` (or `--n-iter 4` on the single-model CLIs) is the
+  quick check.
+- The forest is by far the biggest artifact: ~90 MB per condition against 6 KB for the
+  baseline and 1.6 MB for XGBoost, and the saved explainer carries a copy of the chosen model,
+  so a condition where the forest wins costs ~180 MB. `ml/models/` is gitignored, so this only
+  costs local disk — but it is a reason not to ship the forest unless it earns its place.
 - Builds on H11 → H10 → H09.
 - H13 (`train.py`) calls all three trainers, saves all three models, and picks the best by
   validation ROC-AUC.
