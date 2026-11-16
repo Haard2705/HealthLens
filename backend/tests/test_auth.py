@@ -33,6 +33,7 @@ def test_cookie_is_secure_in_production():
         env="production",
         jwt_secret="x" * 40,
         demo_password="prod-demo-password",
+        database_url="",
         _env_file=None,
     )
     client = TestClient(create_app(settings), base_url="https://testserver")

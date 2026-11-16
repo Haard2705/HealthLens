@@ -5,10 +5,11 @@
     python -m ml.src.train --fast                # quick run (small search) for checking
 
 For each condition (H49 registry) it splits the data (H10), trains the logistic regression
-baseline (H11) and XGBoost (H12) on exactly the same rows, picks the best model on the
-**validation** set (never the test set), and writes:
+baseline (H11), a random forest and XGBoost (H12) on exactly the same rows, picks the best
+model on the **validation** set (never the test set), and writes:
 
     ml/models/<condition>/logreg.joblib       fitted pipeline (preprocessor + model)
+    ml/models/<condition>/random_forest.joblib
     ml/models/<condition>/xgboost.joblib
     ml/models/<condition>/metrics.json        every model's metrics, best_model, how it was chosen
     ml/models/<condition>/model_meta.json     what the backend needs to call the model safely
@@ -43,12 +44,12 @@ from .registry import Condition, RegistryError, load_registry
 MODELS_DIR = config.REPO_ROOT / "ml" / "models"
 INDEX_FILE = "index.json"
 # Simplest first: on a tie the earlier (easier to explain) model wins.
-MODEL_ORDER = ("logreg", "xgboost")
+MODEL_ORDER = ("logreg", "random_forest", "xgboost")
 # Validation ROC-AUC differences smaller than this count as a tie.
 TIE_MARGIN = 0.005
 SELECTION_CRITERION = (
     f"highest validation ROC-AUC; models within {TIE_MARGIN} of the best count as tied "
-    "and the simpler one (logreg before xgboost) is chosen"
+    "and the simplest one (logreg, then random_forest, then xgboost) is chosen"
 )
 
 
@@ -57,13 +58,26 @@ class Settings:
     """How hard to search. `fast()` is for smoke tests and quick checks."""
 
     logreg_cv: int = 5
+    forest_n_iter: int = 6
+    forest_cv: int = 3
+    forest_tuning_rows: int = 40_000
+    forest_trees: int = 300
     xgb_n_iter: int = 12
     xgb_cv: int = 3
     xgb_tuning_rows: int = 100_000
 
     @classmethod
     def fast(cls) -> Settings:
-        return cls(logreg_cv=2, xgb_n_iter=2, xgb_cv=2, xgb_tuning_rows=20_000)
+        return cls(
+            logreg_cv=2,
+            forest_n_iter=2,
+            forest_cv=2,
+            forest_tuning_rows=20_000,
+            forest_trees=30,
+            xgb_n_iter=2,
+            xgb_cv=2,
+            xgb_tuning_rows=20_000,
+        )
 
 
 def _trainers(settings: Settings) -> dict[str, Callable[[evaluate.Split], Any]]:
@@ -75,6 +89,17 @@ def _trainers(settings: Settings) -> dict[str, Callable[[evaluate.Split], Any]]:
 
         return module.train_logreg(split, cv=settings.logreg_cv)
 
+    def random_forest(split: evaluate.Split) -> Any:
+        from . import forest
+
+        return forest.train_forest(
+            split,
+            n_iter=settings.forest_n_iter,
+            cv=settings.forest_cv,
+            max_tuning_rows=settings.forest_tuning_rows,
+            n_trees=settings.forest_trees,
+        )
+
     def xgboost(split: evaluate.Split) -> Any:
         from . import boosting
 
@@ -85,7 +110,7 @@ def _trainers(settings: Settings) -> dict[str, Callable[[evaluate.Split], Any]]:
             max_tuning_rows=settings.xgb_tuning_rows,
         )
 
-    return {"logreg": logreg, "xgboost": xgboost}
+    return {"logreg": logreg, "random_forest": random_forest, "xgboost": xgboost}
 
 
 # --------------------------------------------------------------------------

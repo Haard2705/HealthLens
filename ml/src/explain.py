@@ -4,15 +4,19 @@ A SHAP explanation splits one prediction into a starting point plus one push per
 
     base value + contribution(BMI) + contribution(age) + ... = the model's output
 
-in **log-odds** (the scale the models work on internally). A positive contribution raised
+in **log-odds** for the two models that work on that scale. A positive contribution raised
 this person's estimate, a negative one lowered it. Contributions add up exactly, so they are
 an honest account of what the model did, not a story told afterwards.
 
-How they're computed (no `shap` package needed at prediction time, so the backend stays light):
+How they're computed:
 
 * **XGBoost**: XGBoost's built-in TreeSHAP (`pred_contribs=True`), the same numbers
-  `shap.TreeExplainer` gives (a CI test checks that).
+  `shap.TreeExplainer` gives (a CI test checks that). No `shap` package needed.
 * **Logistic regression**: exact linear SHAP, `coefficient × (value − training average)`.
+  No `shap` package needed either, so the backend stays light for both.
+* **Random forest**: `shap.TreeExplainer`, which is exact for forests. A forest averages
+  probabilities rather than log-odds, so its contributions are **in probability** and the
+  explanation says so in its `units` field; they still add up to `predict_proba` exactly.
 
 The preprocessor turns one answer into several model columns (e.g. `sex` → `sex = female`,
 `sex = male`; `income_band` → the number and a "was missing" flag). Their contributions are
@@ -34,6 +38,7 @@ from typing import Any
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
@@ -73,7 +78,7 @@ class Explainer:
     """Explains one fitted pipeline. Build with `build_explainer`; save with joblib."""
 
     model: Pipeline
-    kind: str  # "linear" or "tree"
+    kind: str  # "linear", "tree" (XGBoost) or "forest" (random forest, probability units)
     encoded_names: tuple[str, ...]
     sources: tuple[str, ...]  # canonical feature for each encoded column
     predictors: tuple[str, ...]  # canonical features, in the model's input order
@@ -90,6 +95,16 @@ class Explainer:
             contrib = coef * (encoded - self.background_mean)
             base = float(clf.intercept_[0] + coef @ self.background_mean)
             return np.full(len(x), base), contrib
+
+        if self.kind == "forest":
+            import shap
+
+            explainer = shap.TreeExplainer(clf)
+            values = np.asarray(explainer.shap_values(encoded, check_additivity=False))
+            base_value = np.asarray(explainer.expected_value, dtype="float64")
+            if values.ndim == 3:  # (rows, columns, classes) -> keep the "yes" class
+                values, base_value = values[:, :, 1], base_value[1]
+            return np.full(len(x), float(base_value)), values.astype("float64")
 
         from xgboost import DMatrix
 
@@ -130,11 +145,13 @@ class Explainer:
         ]
         items.sort(key=lambda item: abs(item["contribution"]), reverse=True)
         margin = float(base[0] + grouped.iloc[0].sum())
+        # A forest averages probabilities, so its contributions already are the probability.
+        probability = margin if self.kind == "forest" else float(_sigmoid(margin))
         return {
             "base_value": float(base[0]),
             "margin": margin,
-            "probability": float(_sigmoid(margin)),
-            "units": "log-odds",
+            "probability": float(probability),
+            "units": "probability" if self.kind == "forest" else "log-odds",
             "contributions": items,
         }
 
@@ -171,6 +188,8 @@ def build_explainer(model: Pipeline, x_background: pd.DataFrame) -> Explainer:
     if isinstance(clf, LogisticRegression):
         encoded = np.asarray(prep.transform(x_background), dtype="float64")
         return Explainer(model, "linear", encoded_names, sources, predictors, encoded.mean(axis=0))
+    if isinstance(clf, RandomForestClassifier):
+        return Explainer(model, "forest", encoded_names, sources, predictors)
     if type(clf).__name__ == "XGBClassifier":
         return Explainer(model, "tree", encoded_names, sources, predictors)
     raise TypeError(f"no explainer for {type(clf).__name__}")
