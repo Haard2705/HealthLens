@@ -220,3 +220,36 @@ def test_tree_contributions_match_the_shap_library(split) -> None:
     encoded = model.named_steps["prep"].transform(x)
     theirs = shap.TreeExplainer(model.named_steps["clf"]).shap_values(encoded)
     np.testing.assert_allclose(ours, np.asarray(theirs), atol=1e-4)
+
+
+# ---- random forest (probability units, via the shap library) ------------------------------
+
+
+@pytest.fixture(scope="module")
+def tree_forest(split) -> explain.Explainer:
+    pytest.importorskip("shap")
+    from src import forest
+
+    fit, _ = evaluate.validation_split(split)
+    model = forest.fit_forest(split.predictors, {"max_depth": 6}, fit, n_trees=25)
+    return explain.build_explainer(model, explain.background_sample(split.x_train))
+
+
+def test_forest_base_plus_contributions_equals_the_probability(tree_forest, split) -> None:
+    # A forest averages probabilities, so its contributions add up to predict_proba itself.
+    x = split.x_test.iloc[:50]
+    base, grouped = tree_forest.contributions(x)
+    probability = tree_forest.model.predict_proba(x)[:, 1]
+    np.testing.assert_allclose(base + grouped.sum(axis=1).to_numpy(), probability, atol=1e-4)
+
+
+def test_forest_explanation_says_which_units_it_is_in(tree_forest, split) -> None:
+    row = one(split)
+    result = tree_forest.explain(row)
+    assert tree_forest.kind == "forest"
+    assert result["units"] == "probability"
+    assert result["probability"] == pytest.approx(
+        tree_forest.model.predict_proba(row)[0, 1], abs=1e-4
+    )
+    assert sorted(i["feature"] for i in result["contributions"]) == sorted(split.predictors)
+    json.dumps(result)
