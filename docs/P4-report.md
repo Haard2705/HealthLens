@@ -40,7 +40,7 @@ chronic kidney disease and depression.
 |---|---|---|---|
 | FR1 | One-command clean of BRFSS; codes to missing; weights preserved | **Complete** | `python -m ml.src.clean` → 356,158 rows; `ml/tests/test_clean.py` |
 | FR2 | Weighted prevalence with filters (age, sex, income, risk factor) | **Complete** | `GET /stats/prevalence`; groupings: age band, BMI band, sex, income band, physical activity. Fig. 2 |
-| FR3 | Three models per condition, scores side by side | **Partial** | Logistic regression and XGBoost compared on one split for all nine; random forest in progress. Fig. 3 |
+| FR3 | Three models per condition, scores side by side | **Complete** | Logistic regression, random forest and XGBoost trained on one split for all nine. Fig. 3 |
 | FR4 | SHAP explanations summing to the model output, as sentences | **Complete** | `ml/src/explain.py`, `explanations.py`; sum-to-margin test. Fig. 5, 6 |
 | FR5 | Model card per condition, incl. subgroup results | **Complete** | `docs/model-cards/*.md`, nine cards with calibration figures |
 | FR6 | Estimate from entered risk factors, or an explanation of why not | **Complete** | `POST /api/v1/predict`; blocked conditions return HTTP 409 with the gate's reason |
@@ -152,9 +152,9 @@ most likely to materialise, and it did.
 
 | Suite | Tests | Coverage |
 |---|---|---|
-| ML pipeline | 338 | 97% |
+| ML pipeline | 357 | 97% |
 | Backend API | 224 | 91% |
-| **Total** | **562** | gate: 70% |
+| **Total** | **581** | gate: 70% |
 
 The most important suite is a parametrised role × endpoint × expected-status matrix. It proves
 that a doctor cannot read another doctor's patient, a patient cannot reach admin routes, a
@@ -173,36 +173,42 @@ Cleaned dataset: **356,158 respondents**, 2025 CDC BRFSS. Weighted prevalence:
 | Asthma | 16.0% | Stroke | 3.7% |
 | Diabetes | 12.5% | | |
 
-Model performance on a held-out 20% test set (~70,000 respondents per condition), for the model
-selected on validation data:
+All three models were trained on the same split for every condition. Test-set ROC-AUC
+(~70,000 held-out respondents per condition), with the model selected on **validation** data:
 
-| Condition | Model | ROC-AUC | PR-AUC | Recall | Precision | Individual estimate |
-|---|---|---|---|---|---|---|
-| COPD | Logistic regression | 0.836 | 0.351 | 0.80 | 0.20 | Enabled (strong) |
-| Heart disease | Logistic regression | 0.826 | 0.317 | 0.80 | 0.21 | Enabled (strong) |
-| Diabetes | XGBoost | 0.803 | 0.384 | 0.81 | 0.29 | Enabled (strong) |
-| Hypertension | Logistic regression | 0.790 | 0.705 | 0.80 | 0.61 | Enabled (moderate) |
-| Kidney disease | Logistic regression | 0.788 | 0.170 | 0.79 | 0.11 | Enabled (moderate) |
-| Arthritis | Logistic regression | 0.787 | 0.629 | 0.80 | 0.54 | Enabled (moderate) |
-| Stroke | Logistic regression | 0.783 | 0.140 | 0.78 | 0.09 | Enabled (moderate) |
-| Depression | XGBoost | 0.736 | 0.448 | 0.80 | 0.31 | **Blocked — sensitive** |
-| Asthma | XGBoost | 0.661 | 0.278 | 0.81 | 0.20 | **Blocked — below 0.70** |
+| Condition | Logistic reg. | Random forest | XGBoost | Selected | Individual estimate |
+|---|---|---|---|---|---|
+| COPD | 0.836 | 0.832 | 0.840 | Logistic regression | Enabled (strong) |
+| Heart disease | 0.826 | 0.822 | 0.828 | Logistic regression | Enabled (strong) |
+| Diabetes | 0.794 | 0.799 | 0.803 | Random forest | Enabled (moderate) |
+| Hypertension | 0.790 | 0.791 | 0.795 | Logistic regression | Enabled (moderate) |
+| Arthritis | 0.788 | 0.788 | 0.792 | Logistic regression | Enabled (moderate) |
+| Kidney disease | 0.788 | 0.782 | 0.791 | Logistic regression | Enabled (moderate) |
+| Stroke | 0.783 | 0.782 | 0.787 | Logistic regression | Enabled (moderate) |
+| Depression | 0.728 | 0.728 | 0.736 | XGBoost | **Blocked — sensitive** |
+| Asthma | 0.653 | 0.651 | 0.661 | XGBoost | **Blocked — below 0.70** |
 
-Recall and precision are reported at the recall-oriented operating point chosen on validation
-data, which is the threshold a screening tool would use. Three observations worth recording:
+Full training run: 38 minutes for 9 conditions × 3 models with hyperparameter search.
 
+Four observations worth recording:
+
+- **The three models are within 0.01 ROC-AUC of each other on every condition.** The spread
+  between the simplest and the most complex model never exceeds one percentage point. The
+  honest reading is that these survey answers carry little exploitable non-linearity, so added
+  model complexity buys almost nothing here. This is the main empirical finding so far, and it
+  is the argument for showing the comparison rather than asserting that a complex model is best.
+- **Logistic regression is selected for six of nine conditions.** The rule is to prefer the
+  simpler model unless a more complex one is clearly better on validation data, and by that rule
+  the interpretable model usually wins.
 - **Seven of nine conditions pass the release gate.** The two that do not are blocked for
-  different reasons, and the application states which.
-- **Logistic regression wins for six of nine conditions.** The team's rule — prefer the simpler
-  model unless the complex one is clearly better on validation data — meant the interpretable
-  model was selected more often than not. This is a result, not a shortcut.
+  different reasons, and the application says which.
 - **Precision is low where the condition is rare.** For stroke (3.7% prevalence) a threshold set
-  to catch 78% of cases flags roughly eleven people for every one who has it. The interface
-  states this in words rather than presenting the percentage alone, which is the reason the
-  explanation layer exists.
+  to catch 78% of cases flags roughly eleven people for each one who has it. The interface says
+  this in words rather than showing the percentage alone, which is why the explanation layer
+  exists.
 
 Verified example output, from the running system (patient P-0103, synthetic, heart disease):
-estimated risk 24%, strong signal, logistic regression. Largest contributions: self-rated
+estimated risk 24%, strong signal, logistic regression (the model selected for heart disease). Largest contributions: self-rated
 general health *fair* (+0.81 log-odds), age 65–69 (+0.63), male (+0.37), daily smoker (+0.34).
 Among survey respondents aged 65–69 with a BMI of 30 or more, 15.2% report heart disease
 (n = 11,952).
@@ -213,13 +219,11 @@ Among survey respondents aged 65–69 with a BMI of 30 or more, 15.2% report hea
 
 ### Remaining before the final project
 
-1. **Random forest** as the third model (FR3), to complete the comparison promised in P3.
-2. **Frontend completion**: remaining accessibility work and the usability test with five
+1. **Frontend completion**: remaining accessibility work and the usability test with five
    classmates (NFR4).
-3. **Deployment** of both tiers, and promotion of PostgreSQL from optional to default.
-4. **A fuller hyperparameter search**, and subgroup and calibration analysis written into the
-   Tier 1 model cards.
-5. **CCHS decision** — whether to add the Canadian survey as a second source.
+2. **Deployment** of both tiers, and promotion of PostgreSQL from optional to default.
+3. **Subgroup and calibration analysis** written into the Tier 1 model cards.
+4. **CCHS decision** — whether to add the Canadian survey as a second source.
 
 ### Challenges encountered
 
@@ -255,7 +259,7 @@ Among survey respondents aged 65–69 with a BMI of 30 or more, 15.2% report hea
 
 | Window | Work |
 |---|---|
-| 16–21 Nov | Random forest; remaining frontend screens; subgroup results in the Tier 1 model cards |
+| 16–21 Nov | Remaining frontend screens; subgroup results in the Tier 1 model cards |
 | 22–27 Nov | Deployment; accessibility fixes; usability test with five classmates; security review. **Feature freeze 27 November** |
 | 28 Nov – 4 Dec | Final evaluation, report, demonstration rehearsal |
 
