@@ -185,6 +185,10 @@ def test_admin_system_reports_the_live_storage(app: FastAPI):
 @pytest.fixture
 def postgres_engine():
     created = engine.create_engine(DATABASE_URL)
+    # Apply the schema here rather than in one test, so these tests pass in any order.
+    from backend.scripts import seed_db
+
+    seed_db.apply_schema(created)
     yield created
     created.dispose()
 
@@ -245,11 +249,14 @@ def test_the_audit_log_can_only_grow(postgres_engine):
 
 @pytest.mark.integration
 @needs_postgres
-def test_the_api_runs_on_postgres(settings: Settings):
+def test_the_api_runs_on_postgres(settings: Settings, postgres_engine):
     """The app boots against Postgres and every store it holds is the Postgres one."""
     from fastapi.testclient import TestClient
 
     from backend.app.main import create_app
+    from backend.scripts import seed_db
+
+    seed_db.seed(postgres_engine, "integration-test-password")
 
     application = create_app(settings.model_copy(update={"database_url": DATABASE_URL}))
     with TestClient(application) as client:

@@ -42,6 +42,9 @@ def settings(tmp_path: Path) -> Settings:
         demo_password=DEMO_PASSWORD,
         model_dir=tmp_path / "models",
         processed_data_path=tmp_path / "missing.parquet",
+        # Pin the store to memory. Without this, a DATABASE_URL in the environment (CI sets
+        # one for the integration tests) would send every unit test at a real database.
+        database_url="",
         _env_file=None,
     )
 
