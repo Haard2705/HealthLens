@@ -1,0 +1,43 @@
+# Keep the build context small and the image lean. Everything here is either huge,
+# irrelevant to the API, or a secret.
+
+# Survey microdata: ~800 MB, and the API never reads the raw file.
+data/raw/
+
+# Training-only model files. The API loads only <condition>/explainer.joblib, which already
+# holds the chosen pipeline plus its SHAP explainer, so the other three are dead weight
+# (random_forest alone is 355 MB).
+ml/models/*/logreg.joblib
+ml/models/*/random_forest.joblib
+ml/models/*/xgboost.joblib
+
+# Not part of the API image.
+frontend/
+docs/
+scripts/
+ml/notebooks/
+ml/tests/
+backend/tests/
+.github/
+.claude/
+
+# Local environments and caches.
+.venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+node_modules/
+.next/
+
+# Version control and editor state.
+.git/
+.gitignore
+.idea/
+.vscode/
+
+# Secrets never belong in an image.
+.env
+.env.*
+!.env.example
