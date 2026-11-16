@@ -64,14 +64,17 @@ INSERT_AUDIT_EVENT = """
         :patient_id, :outcome, :request_id
     ) RETURNING id
 """
+# The filters are all optional, so each one is "no filter given, or it matches". The casts are
+# required: given a bare :actor on both sides of an OR, Postgres cannot infer the parameter's
+# type and refuses the statement with "could not determine data type".
 SELECT_AUDIT_EVENTS = """
     SELECT id, occurred_at, actor_id, actor_role, action, resource_type, resource_id,
            patient_id, outcome, request_id
       FROM audit_events
-     WHERE (:actor IS NULL OR actor_id = :actor)
-       AND (:patient IS NULL OR patient_id = :patient)
-       AND (:action IS NULL OR action = :action)
-       AND (:outcome IS NULL OR outcome = :outcome)
+     WHERE (CAST(:actor AS TEXT) IS NULL OR actor_id = CAST(:actor AS TEXT))
+       AND (CAST(:patient AS TEXT) IS NULL OR patient_id = CAST(:patient AS TEXT))
+       AND (CAST(:action AS TEXT) IS NULL OR action = CAST(:action AS TEXT))
+       AND (CAST(:outcome AS TEXT) IS NULL OR outcome = CAST(:outcome AS TEXT))
      ORDER BY id
 """
 
