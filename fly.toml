@@ -38,12 +38,14 @@ primary_region = "yyz"              # Toronto: closest Fly region to Thunder Bay
   auto_start_machines = true
   min_machines_running = 1
 
-  [http_service.checks]
-    [http_service.checks.health]
-      path = "/health"
-      interval = "30s"
-      timeout = "5s"
-      grace_period = "40s"
+  # An array of tables, not a nested table: fly.toml's schema types this field as a
+  # list of checks, and a [http_service.checks.<name>] block fails to parse.
+  [[http_service.checks]]
+    path = "/health"
+    method = "GET"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "40s"
 
 [[vm]]
   size = "shared-cpu-1x"
