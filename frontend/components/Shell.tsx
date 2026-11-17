@@ -76,7 +76,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </Link>
           <div className="who">
             {loading ? (
-              <span className="small muted">Checking sign-in…</span>
+              <span className="small muted">Checking sign-inâ€¦</span>
             ) : user ? (
               <>
                 <span className="pill acc">{user.role}</span>
@@ -117,7 +117,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <main className="wrap">{children}</main>
 
       <footer className="wrap">
-        Student project � survey numbers from CDC BRFSS 2025 � every patient in the demo is
+        Student project · survey numbers from CDC BRFSS 2025 · every patient in the demo is
         invented
       </footer>
     </>
