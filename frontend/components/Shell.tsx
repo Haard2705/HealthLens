@@ -43,6 +43,18 @@ function isCurrent(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/**
+ * Routes that can put a risk number or a patient record in front of someone. The safety
+ * notice belongs there and nowhere else: repeated on the home page and on aggregate
+ * population charts it is just noise, and a disclaimer people have learned to skip is
+ * worse than one they read.
+ */
+const RISK_ROUTES = ["/me", "/doctor", "/models"];
+
+function needsSafetyNotice(pathname: string): boolean {
+  return RISK_ROUTES.some((route) => isCurrent(pathname, route));
+}
+
 export function Shell({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut } = useSession();
   const pathname = usePathname();
@@ -96,24 +108,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      <div className="banner">
-        <div className="wrap">{SAFETY_BANNER}</div>
-      </div>
+      {needsSafetyNotice(pathname) ? (
+        <div className="banner">
+          <div className="wrap">{SAFETY_BANNER}</div>
+        </div>
+      ) : null}
 
       <main className="wrap">{children}</main>
 
       <footer className="wrap">
-        <div className="row">
-          <Link className="btn link small" href="/models">
-            Model results and the release gate
-          </Link>
-          <Link className="btn link small" href="/explore">
-            Explore the population
-          </Link>
-        </div>
-        HealthLens is a student project: FastAPI + per-condition models with SHAP explanations,
-        read through this Next.js dashboard. Survey numbers come from the CDC BRFSS annual file;
-        every patient in the demo is invented.
+        Student project · survey numbers from CDC BRFSS 2025 · every patient in the demo is
+        invented
       </footer>
     </>
   );

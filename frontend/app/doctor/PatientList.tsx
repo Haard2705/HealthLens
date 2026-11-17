@@ -52,10 +52,7 @@ export function PatientList() {
       <div className="row between">
         <div>
           <h1 className="pt">My patients</h1>
-          <p className="muted">
-            Only patients assigned to you. Everyone else is invisible to your account — the API
-            does not return them, and does not say they exist.
-          </p>
+          <p className="muted">Patients assigned to you.</p>
         </div>
         <label className="f">
           Search
