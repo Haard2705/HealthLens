@@ -11,6 +11,10 @@ import type { NextConfig } from "next";
 const backendUrl = process.env.BACKEND_URL ?? "http://127.0.0.1:8000";
 
 const nextConfig: NextConfig = {
+  // Emit .next/standalone: a self-contained server with only the dependencies actually
+  // imported, so the container image carries no node_modules tree. Vercel ignores this.
+  output: "standalone",
+
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${backendUrl}/api/:path*` }];
   },

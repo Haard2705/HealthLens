@@ -1,5 +1,11 @@
-# HealthLens local stack. Today only Postgres is live (H04); backend and
-# frontend are enabled in H16 / H21. Run: docker compose up db
+# HealthLens local stack: Postgres + FastAPI + Next.js, all three live (H04, H16, H21).
+#
+#   docker compose up --build       the whole app on http://localhost:3000
+#   docker compose up db            just Postgres, for running the apps from your shell
+#
+# The API image bakes in the model artifacts, which are gitignored, so it must be built
+# on a machine that has run the pipeline (`python -m ml.src.train`). Without them the
+# prediction endpoints answer 503 and the rest of the app still works.
 services:
   db:
     image: postgres:16-alpine
@@ -17,24 +23,75 @@ services:
       timeout: 5s
       retries: 10
 
-  # backend:            # enabled in H16
-  #   build: ./backend
-  #   env_file: .env
-  #   environment:
-  #     DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-healthlens}:${POSTGRES_PASSWORD:-healthlens}@db:5432/${POSTGRES_DB:-healthlens}
-  #   volumes:
-  #     - ./ml/models:/app/models:ro
-  #   ports: ["8000:8000"]
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
+  # One-shot: creates the schema and loads the demo users and synthetic patients, then
+  # exits. The API does not create its own schema, so this has to run before it serves
+  # traffic against a fresh database. Re-running it is safe (the seed upserts).
+  seed:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["python", "-m", "backend.scripts.seed_db"]
+    environment:
+      ENV: ${ENV:-development}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-healthlens}:${POSTGRES_PASSWORD:-healthlens}@db:5432/${POSTGRES_DB:-healthlens}?sslmode=disable
+      # sslmode is explicit because backend/app/db/engine.py adds sslmode=require for any
+      # host it does not recognise as local, which is right for Supabase but wrong here:
+      # "db" is a compose service name and the postgres image serves no TLS. The engine
+      # leaves an explicit value alone. Do NOT disable TLS against a hosted database.
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-demo-password-123}
+      # A real value, not ${JWT_SECRET:-}: an empty string still *sets* the variable, which
+      # overrides the in-code development default and makes token signing fail at login
+      # with "HMAC key must not be empty". This value is for the local stack over
+      # synthetic data only; production sets its own via `fly secrets set`.
+      JWT_SECRET: ${JWT_SECRET:-local-compose-only-not-a-secret-0123456789abcdef}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
 
-  # frontend:           # enabled in H21
-  #   build: ./frontend
-  #   environment:
-  #     NEXT_PUBLIC_API_URL: http://localhost:8000
-  #   ports: ["3000:3000"]
-  #   depends_on: [backend]
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      ENV: ${ENV:-development}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-healthlens}:${POSTGRES_PASSWORD:-healthlens}@db:5432/${POSTGRES_DB:-healthlens}?sslmode=disable
+      # sslmode is explicit because backend/app/db/engine.py adds sslmode=require for any
+      # host it does not recognise as local, which is right for Supabase but wrong here:
+      # "db" is a compose service name and the postgres image serves no TLS. The engine
+      # leaves an explicit value alone. Do NOT disable TLS against a hosted database.
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-demo-password-123}
+      # A real value, not ${JWT_SECRET:-}: an empty string still *sets* the variable, which
+      # overrides the in-code development default and makes token signing fail at login
+      # with "HMAC key must not be empty". This value is for the local stack over
+      # synthetic data only; production sets its own via `fly secrets set`.
+      JWT_SECRET: ${JWT_SECRET:-local-compose-only-not-a-secret-0123456789abcdef}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # A build arg, not just an environment variable: Next resolves the rewrite
+        # destination during `next build` and compiles it into routes-manifest.json.
+        # Service name, not localhost, because inside the compose network the API is
+        # reachable as "api". The browser never sees this; it only ever talks to the web
+        # service, which proxies /api/* onward so the session cookie stays first-party.
+        BACKEND_URL: http://api:8000
+    environment:
+      NEXT_PUBLIC_DEMO_PASSWORD: ${DEMO_PASSWORD:-demo-password-123}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      - api
 
 volumes:
   pgdata:

@@ -1,0 +1,11 @@
+# The build context is frontend/. Keep it to source: npm ci installs from the lockfile
+# and `next build` regenerates everything else.
+node_modules/
+.next/
+out/
+.env
+.env.*
+!.env.example
+.vercel/
+npm-debug.log*
+.DS_Store

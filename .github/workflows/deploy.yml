@@ -1,0 +1,97 @@
+# Manual deploys (H27). Guarded: with no secrets configured the job reports what is
+# missing and still succeeds, so this can live on main from the start without ever
+# failing a run or blocking a merge.
+#
+# The API is deliberately NOT deployed from here. ml/models/ is gitignored, so a runner
+# checking out the repo would build an image with no model artifacts, and every
+# prediction would answer 503 while the rest of the app looked healthy. The API image is
+# built and pushed from a machine that has run the pipeline:
+#     fly deploy --local-only
+# See docs/DEPLOYMENT.md.
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: What to run
+        type: choice
+        default: verify
+        options: [frontend, verify]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  frontend:
+    name: Frontend to Vercel
+    if: inputs.target == 'frontend'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Are the Vercel credentials set?
+        id: gate
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          missing=""
+          [ -n "$VERCEL_TOKEN" ]      || missing="$missing VERCEL_TOKEN"
+          [ -n "$VERCEL_ORG_ID" ]     || missing="$missing VERCEL_ORG_ID"
+          [ -n "$VERCEL_PROJECT_ID" ] || missing="$missing VERCEL_PROJECT_ID"
+          if [ -n "$missing" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Vercel deploy skipped"
+              echo
+              echo "Missing repository secrets:$missing"
+              echo
+              echo "Add them under Settings → Secrets and variables → Actions."
+              echo "Until then, deploy from the Vercel dashboard (see docs/DEPLOYMENT.md)."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Deploy
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: frontend
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          npm i -g vercel@48
+          vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}"
+          vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}"
+          url=$(vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}")
+          echo "### Deployed" >> "$GITHUB_STEP_SUMMARY"
+          echo "$url" >> "$GITHUB_STEP_SUMMARY"
+
+  verify:
+    name: Verify the live API
+    if: inputs.target == 'verify'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health check
+        env:
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          if [ -z "$API_URL" ]; then
+            echo "### Nothing to verify" >> "$GITHUB_STEP_SUMMARY"
+            echo "Set the API_URL repository variable to the deployed API, e.g. https://healthlens-api.fly.dev" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          code=$(curl -sS -o /tmp/body -w '%{http_code}' "$API_URL/health")
+          echo "GET $API_URL/health -> $code"
+          cat /tmp/body
+          test "$code" = "200"
