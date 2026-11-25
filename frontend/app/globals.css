@@ -257,10 +257,6 @@ footer.wrap {
   color: var(--muted);
   font-size: 12px;
 }
-footer .row {
-  gap: 16px;
-  margin-bottom: 6px;
-}
 
 /* ---------- controls ---------- */
 .btn {

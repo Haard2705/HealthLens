@@ -188,9 +188,8 @@ export function ModelResults() {
       <div>
         <h1 className="pt">Model results</h1>
         <p className="muted">
-          Each condition has its own model, trained on survey answers and scored on people it never
-          saw. A written rule then decides whether it may show a personal estimate, so weak or
-          sensitive models cannot mislead anyone.
+          One model per condition, scored on people it never saw. A written rule decides which may
+          show a personal estimate.
         </p>
       </div>
 
