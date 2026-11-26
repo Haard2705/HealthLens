@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS users (
     id            text PRIMARY KEY,
     email         text NOT NULL UNIQUE,
     display_name  text NOT NULL,
-    role          text NOT NULL CHECK (role IN ('admin', 'doctor', 'patient')),
+    role          text NOT NULL CHECK (role IN ('base', 'patient', 'doctor', 'admin', 'super_admin')),
     password_hash text,
     active        boolean NOT NULL DEFAULT true,
     patient_id    text REFERENCES patients (id) ON DELETE SET NULL,

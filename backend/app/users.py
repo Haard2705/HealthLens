@@ -17,9 +17,14 @@ _EMAIL_RE = re.compile(EMAIL_PATTERN)
 
 
 class Role(StrEnum):
-    ADMIN = "admin"
-    DOCTOR = "doctor"
+    # Self-registered accounts start at BASE; roles above it are only ever granted,
+    # never self-chosen. SUPER_ADMIN sits above ADMIN and is the only role that may
+    # grant roles (the grant UI arrives in a later phase).
+    BASE = "base"
     PATIENT = "patient"
+    DOCTOR = "doctor"
+    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
 
 
 def normalize_email(email: str) -> str:
@@ -83,6 +88,7 @@ def _patient_email(name: str) -> str:
 def seed_demo_users(repo: PatientRepository, password: str) -> UserStore:
     pw = hash_password_cached(password)
     users = [
+        User("u-superadmin", f"super@{DEMO_DOMAIN}", "Platform Owner", Role.SUPER_ADMIN, pw),
         User("u-admin", f"admin@{DEMO_DOMAIN}", "Demo Admin", Role.ADMIN, pw),
         *(
             User(

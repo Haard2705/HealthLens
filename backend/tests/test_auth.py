@@ -7,7 +7,10 @@ from fastapi.testclient import TestClient
 
 from backend.app import security
 from backend.app.config import ConfigError, Settings
+from backend.app.data.repository import SyntheticRepository
 from backend.app.main import create_app
+from backend.app.security import hash_password
+from backend.app.users import Role, User, seed_demo_users
 from backend.tests.conftest import ADMIN, CHEN, DEMO_PASSWORD, audit_events
 
 LOGIN = "/api/v1/auth/login"
@@ -201,3 +204,27 @@ def test_unexpected_exception_uses_envelope(app):
     assert response.json() == {
         "error": {"code": "internal_error", "message": "Something went wrong."}
     }
+
+
+# ---- Task 1: base + super_admin roles ------------------------------------------------
+
+def test_role_enum_has_base_and_super_admin():
+    assert Role("base") is Role.BASE
+    assert Role("super_admin") is Role.SUPER_ADMIN
+
+
+def test_seed_includes_one_super_admin():
+    users = seed_demo_users(SyntheticRepository(), "demo-password-123").all()
+    supers = [u for u in users if u.role is Role.SUPER_ADMIN]
+    assert len(supers) == 1
+    assert supers[0].email == "super@demo.healthlens.test"
+
+
+def test_base_user_forbidden_from_doctor_list(app, login_as):
+    app.state.hl.users.add(
+        User("u-base-test", "base@demo.healthlens.test", "Base User", Role.BASE,
+             hash_password(DEMO_PASSWORD))
+    )
+    client = login_as("base@demo.healthlens.test")
+    resp = client.get("/api/v1/doctor/patients")
+    assert resp.status_code == 403
