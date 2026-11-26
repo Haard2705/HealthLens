@@ -10,6 +10,7 @@ export interface Session {
   loading: boolean;
   refresh: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<User>;
+  signUp: (fullName: string, email: string, password: string) => Promise<User>;
   signOut: () => Promise<void>;
 }
 
@@ -42,6 +43,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return signedIn;
   }, []);
 
+  const signUp = useCallback(async (fullName: string, email: string, password: string) => {
+    const created = await apiSend<User>("POST", "/auth/register", {
+      full_name: fullName,
+      email,
+      password,
+    });
+    setUser(created);
+    setLoading(false);
+    return created;
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       await apiSend<void>("POST", "/auth/logout");
@@ -51,7 +63,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <SessionContext.Provider value={{ user, loading, refresh, signIn, signOut }}>
+    <SessionContext.Provider value={{ user, loading, refresh, signIn, signUp, signOut }}>
       {children}
     </SessionContext.Provider>
   );

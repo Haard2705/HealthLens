@@ -20,6 +20,11 @@ const PUBLIC_NAV: NavItem[] = [
 ];
 
 const NAV_BY_ROLE: Record<Role, NavItem[]> = {
+  base: [
+    { href: "/welcome", label: "My health" },
+    { href: "/explore", label: "Explore" },
+    { href: "/", label: "Home" },
+  ],
   patient: [
     { href: "/me", label: "My health" },
     { href: "/explore", label: "Explore" },
@@ -32,6 +37,12 @@ const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { href: "/", label: "Home" },
   ],
   admin: [
+    { href: "/admin", label: "Users and audit" },
+    { href: "/models", label: "Model results" },
+    { href: "/explore", label: "Explore" },
+    { href: "/", label: "Home" },
+  ],
+  super_admin: [
     { href: "/admin", label: "Users and audit" },
     { href: "/models", label: "Model results" },
     { href: "/explore", label: "Explore" },

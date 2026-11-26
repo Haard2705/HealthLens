@@ -47,9 +47,11 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
 ];
 
 const LANDING: Record<Role, string> = {
+  base: "/welcome",
   patient: "/me",
   doctor: "/doctor",
   admin: "/admin",
+  super_admin: "/admin",
 };
 
 export function LoginForm() {
