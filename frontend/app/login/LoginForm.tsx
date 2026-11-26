@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/components/SessionProvider";
 import { errorMessage } from "@/lib/api";
@@ -47,9 +48,13 @@ const DEMO_ACCOUNTS: DemoAccount[] = [
 ];
 
 const LANDING: Record<Role, string> = {
+  base: "/welcome",
   patient: "/me",
   doctor: "/doctor",
   admin: "/admin",
+  // super_admin's admin powers are not wired until the role-grant phase; send it to
+  // home for now, not /admin, where it would hit a wrong-role error.
+  super_admin: "/",
 };
 
 export function LoginForm() {
@@ -81,8 +86,12 @@ export function LoginForm() {
       <div>
         <h1 className="pt">Sign in</h1>
         <p className="muted">
-          Pick a demo role to see what that person is allowed to see. The three accounts hold
-          synthetic data only.
+          New here?{" "}
+          <Link href="/register">
+            <strong>Create an account</strong>
+          </Link>
+          . Or pick a demo role below to see what that person is allowed to see — the three demo
+          accounts hold synthetic data only.
         </p>
       </div>
 
@@ -160,8 +169,8 @@ export function LoginForm() {
       </form>
 
       <p className="small muted">
-        Sign-in sets an httpOnly session cookie. Accounts are invite-only: nobody can register
-        themselves, and repeated failures are rate-limited.
+        Sign-in sets an httpOnly session cookie, and repeated failures are rate-limited. A new
+        account starts with a limited view; a doctor or admin role is granted, never self-assigned.
       </p>
     </div>
   );

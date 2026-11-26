@@ -1,6 +1,6 @@
 /** Response shapes from the HealthLens API (`backend/openapi.json`). */
 
-export type Role = "admin" | "doctor" | "patient";
+export type Role = "base" | "patient" | "doctor" | "admin" | "super_admin";
 
 export interface User {
   id: string;
