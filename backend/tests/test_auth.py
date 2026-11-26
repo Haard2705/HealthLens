@@ -208,6 +208,7 @@ def test_unexpected_exception_uses_envelope(app):
 
 # ---- Task 1: base + super_admin roles ------------------------------------------------
 
+
 def test_role_enum_has_base_and_super_admin():
     assert Role("base") is Role.BASE
     assert Role("super_admin") is Role.SUPER_ADMIN
@@ -222,9 +223,55 @@ def test_seed_includes_one_super_admin():
 
 def test_base_user_forbidden_from_doctor_list(app, login_as):
     app.state.hl.users.add(
-        User("u-base-test", "base@demo.healthlens.test", "Base User", Role.BASE,
-             hash_password(DEMO_PASSWORD))
+        User(
+            "u-base-test",
+            "base@demo.healthlens.test",
+            "Base User",
+            Role.BASE,
+            hash_password(DEMO_PASSWORD),
+        )
     )
     client = login_as("base@demo.healthlens.test")
     resp = client.get("/api/v1/doctor/patients")
     assert resp.status_code == 403
+
+
+# ---- Task 2: self-service registration -----------------------------------------------
+
+REGISTER = "/api/v1/auth/register"
+
+
+def test_register_creates_base_user_and_sets_cookie(anon):
+    r = anon.post(
+        REGISTER,
+        json={"full_name": "Sam Lee", "email": "sam@example.com", "password": "pw-at-least-8"},
+    )
+    assert r.status_code == 201
+    body = r.json()
+    assert body["role"] == "base"
+    assert body["email"] == "sam@example.com"
+    assert "hl_session" in r.cookies
+
+
+def test_register_then_login_roundtrip(anon):
+    anon.post(
+        REGISTER,
+        json={"full_name": "Sam Lee", "email": "Sam@Example.com", "password": "pw-at-least-8"},
+    )
+    r = anon.post(LOGIN, json={"email": "sam@example.com", "password": "pw-at-least-8"})
+    assert r.status_code == 200
+    assert r.json()["role"] == "base"
+
+
+def test_register_duplicate_email_differing_case_409(anon):
+    payload = {"full_name": "A", "email": "dup@example.com", "password": "pw-at-least-8"}
+    anon.post(REGISTER, json=payload)
+    r = anon.post(REGISTER, json={**payload, "email": "DUP@example.com", "full_name": "B"})
+    assert r.status_code == 409
+
+
+def test_register_password_too_short_422(anon):
+    r = anon.post(
+        REGISTER, json={"full_name": "A", "email": "x@example.com", "password": "short7!"}
+    )
+    assert r.status_code == 422

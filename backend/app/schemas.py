@@ -21,6 +21,12 @@ class LoginRequest(_Strict):
     password: str = Field(min_length=1, max_length=256)
 
 
+class RegisterRequest(_Strict):
+    full_name: str = Field(min_length=1, max_length=120)
+    email: Email = Field(min_length=3)
+    password: str = Field(min_length=8, max_length=256)
+
+
 class UserOut(_Strict):
     id: str
     email: str
