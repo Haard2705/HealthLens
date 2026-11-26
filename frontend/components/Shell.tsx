@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { BrandMark } from "./Brand";
 import { useSession } from "./SessionProvider";
+import { ThemeToggle } from "./ThemeToggle";
 import { SAFETY_BANNER } from "@/lib/format";
 import type { Role } from "@/lib/types";
 
@@ -75,8 +76,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
             HealthLens
           </Link>
           <div className="who">
+            <ThemeToggle />
             {loading ? (
-              <span className="small muted">Checking sign-inâ€¦</span>
+              <span className="small muted">Checking sign-in…</span>
             ) : user ? (
               <>
                 <span className="pill acc">{user.role}</span>

@@ -24,9 +24,19 @@ export const metadata: Metadata = {
     "See what drives health risk, in plain language: population patterns from a national health survey, with role-checked patient records.",
 };
 
+// Applies the saved theme before first paint, so there is no light→dark flash on load.
+const NO_FLASH = `(function(){try{var t=localStorage.getItem("hl-theme");if(t==="light"||t==="dark"){document.documentElement.dataset.theme=t;}}catch(e){}})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${plexSans.variable} ${plexMono.variable}`}>
+    <html
+      lang="en"
+      className={`${plexSans.variable} ${plexMono.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: NO_FLASH }} />
+      </head>
       <body>
         <SessionProvider>
           <Shell>{children}</Shell>

@@ -6,15 +6,16 @@
 :root {
   --font: var(--font-plex-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: var(--font-plex-mono), ui-monospace, Consolas, monospace;
-  --bg: #f3f6f7;
-  --surface: #ffffff;
-  --sunk: #eaf0f2;
-  --ink: #14232b;
-  --muted: #586a72;
-  --line: #d6dfe3;
-  --accent: #0e6e73;
-  --accent-ink: #ffffff;
-  --accent-weak: #dceeef;
+  /* Direction C — warm & approachable: warm paper, calm sage green. */
+  --bg: #eef0ea;
+  --surface: #fbfcf9;
+  --sunk: #e4e7dd;
+  --ink: #2c342a;
+  --muted: #6d7a65;
+  --line: #cdd4c3;
+  --accent: #4f6f4a;
+  --accent-ink: #fbfcf9;
+  --accent-weak: #e2e8da;
   --up: #c4492b;
   --down: #2f6fb5;
   --warn-bg: #fbf0d3;
@@ -26,17 +27,20 @@
   --bad-bg: #fbe4e2;
 }
 
+/* Warm-dark counterpart to Direction C. Defined twice: once for the OS preference
+   (unless the user forced light) and once for an explicit toggle to dark, so the
+   toggle wins on either OS setting. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0d191e;
-    --surface: #14252b;
-    --sunk: #1b3038;
-    --ink: #e5eef1;
-    --muted: #9bb0b8;
-    --line: #27414a;
-    --accent: #52c7cb;
-    --accent-ink: #06282a;
-    --accent-weak: #17393d;
+    --bg: #1a1d17;
+    --surface: #23271f;
+    --sunk: #2b3026;
+    --ink: #e8ece0;
+    --muted: #9aa48d;
+    --line: #363d2e;
+    --accent: #8fb382;
+    --accent-ink: #141a0f;
+    --accent-weak: #2a3222;
     --up: #f08b6a;
     --down: #74aeeb;
     --warn-bg: #3b3013;
@@ -48,6 +52,28 @@
     --bad-bg: #40201f;
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1a1d17;
+  --surface: #23271f;
+  --sunk: #2b3026;
+  --ink: #e8ece0;
+  --muted: #9aa48d;
+  --line: #363d2e;
+  --accent: #8fb382;
+  --accent-ink: #141a0f;
+  --accent-weak: #2a3222;
+  --up: #f08b6a;
+  --down: #74aeeb;
+  --warn-bg: #3b3013;
+  --warn-ink: #f1d88e;
+  --ok: #5ed394;
+  --ok-bg: #16382a;
+  --off-bg: #223841;
+  --bad: #ff8a80;
+  --bad-bg: #40201f;
+  color-scheme: dark;
 }
 
 *,
@@ -878,4 +904,12 @@ svg .gl {
   main.wrap {
     padding-block: 28px 72px;
   }
+}
+
+/* Theme toggle: a compact icon button that keeps a steady width as the glyph swaps. */
+.theme-toggle {
+  min-width: 36px;
+  text-align: center;
+  line-height: 1;
+  font-size: 15px;
 }
