@@ -52,7 +52,9 @@ const LANDING: Record<Role, string> = {
   patient: "/me",
   doctor: "/doctor",
   admin: "/admin",
-  super_admin: "/admin",
+  // super_admin's admin powers are not wired until the role-grant phase; send it to
+  // home for now, not /admin, where it would hit a wrong-role error.
+  super_admin: "/",
 };
 
 export function LoginForm() {
