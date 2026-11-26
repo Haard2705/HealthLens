@@ -54,3 +54,6 @@ Thumbs.db
 
 # Generated report renders (regenerate from docs/P4-report.md)
 docs/P4_HealthLens.pdf
+
+# Superpowers execution scratch (ledger, briefs, review packages) — never committed
+.superpowers/
