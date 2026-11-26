@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/components/SessionProvider";
 import { errorMessage } from "@/lib/api";
@@ -83,8 +84,12 @@ export function LoginForm() {
       <div>
         <h1 className="pt">Sign in</h1>
         <p className="muted">
-          Pick a demo role to see what that person is allowed to see. The three accounts hold
-          synthetic data only.
+          New here?{" "}
+          <Link href="/register">
+            <strong>Create an account</strong>
+          </Link>
+          . Or pick a demo role below to see what that person is allowed to see — the three demo
+          accounts hold synthetic data only.
         </p>
       </div>
 
@@ -162,8 +167,8 @@ export function LoginForm() {
       </form>
 
       <p className="small muted">
-        Sign-in sets an httpOnly session cookie. Accounts are invite-only: nobody can register
-        themselves, and repeated failures are rate-limited.
+        Sign-in sets an httpOnly session cookie, and repeated failures are rate-limited. A new
+        account starts with a limited view; a doctor or admin role is granted, never self-assigned.
       </p>
     </div>
   );
